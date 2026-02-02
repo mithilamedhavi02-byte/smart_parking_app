@@ -1,0 +1,36 @@
+name: parking1
+description: "A Smart Parking Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.10.7 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # --- Firebase Services (Updated Versions) ---
+  firebase_core: ^3.10.1
+  firebase_auth: ^5.4.1
+  cloud_firestore: ^5.6.1
+  firebase_storage: ^12.4.10  # මෙන්න මේ පේළිය වෙනස් කරන්න
+
+  # --- Maps & Location ---
+  google_maps_flutter: ^2.5.3
+  geolocator: ^13.0.1
+
+  # --- UI & Utilities ---
+  google_fonts: ^6.2.1
+  url_launcher: ^6.3.1
+  image_picker: ^1.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
