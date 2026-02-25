@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'driver_booking_screen.dart';
-import 'active_booking_status_screen.dart';
+
+// Pages
+import 'admin_manage_bookings.dart'; // My Bookings saathi vaparu shakto
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -12,160 +13,215 @@ class DriverDashboard extends StatefulWidget {
 }
 
 class _DriverDashboardState extends State<DriverDashboard> {
-  String _searchQuery = "";
-  final TextEditingController _searchController = TextEditingController();
+  int _selectedIndex = 0;
+
+  // Pages chi List
+  final List<Widget> _pages = [
+    const DriverHomeScreen(),
+    const DriverSearchScreen(),
+    const Center(child: Text("My Bookings Page")), // Tumhi tumche Bookings page ithe add kara
+    const DriverProfileScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
+          BottomNavigationBarItem(icon: Icon(Icons.book_online), label: "Bookings"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+        ],
+      ),
+    );
+  }
+}
+
+// --- 1. HOME SCREEN ---
+class DriverHomeScreen extends StatelessWidget {
+  const DriverHomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        _buildHeader("Ready to Park?"),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Nearby Parking Hubs", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 15),
+                _buildParkingList(null), // Home var sarva parking distil
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(String title) {
+    return SliverAppBar(
+      expandedHeight: 180, pinned: true, backgroundColor: const Color(0xFF0F172A),
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(fit: StackFit.expand, children: [
+          Image.network('https://images.unsplash.com/photo-1545179605-1296651e9d43?q=80&w=2070&auto=format&fit=crop', fit: BoxFit.cover),
+          Container(color: Colors.black.withOpacity(0.4)),
+          Positioned(bottom: 30, left: 20, child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold))),
+        ]),
+      ),
+    );
+  }
+}
+
+// --- 2. SEARCH SCREEN (With City Search) ---
+class DriverSearchScreen extends StatefulWidget {
+  const DriverSearchScreen({super.key});
+
+  @override
+  State<DriverSearchScreen> createState() => _DriverSearchScreenState();
+}
+
+class _DriverSearchScreenState extends State<DriverSearchScreen> {
+  String searchCity = "";
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(15)),
+          child: TextField(
+            onChanged: (val) => setState(() => searchCity = val.toLowerCase()),
+            decoration: const InputDecoration(hintText: "Search by City...", border: InputBorder.none, icon: Icon(Icons.search)),
+          ),
+        ),
+      ),
+      body: searchCity.isEmpty
+          ? const Center(child: Text("Enter city name to find parking"))
+          : _buildParkingList(searchCity),
+    );
+  }
+}
+
+// --- 3. PROFILE SCREEN (Like Admin Profile) ---
+class DriverProfileScreen extends StatelessWidget {
+  const DriverProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader(context)),
-
-          // Active Booking Section
-          SliverToBoxAdapter(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('bookings')
-                  .where('driverId', isEqualTo: uid)
-                  .where('status', isEqualTo: 'confirmed')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                  var activeBooking = snapshot.data!.docs.first;
-                  return _buildActiveBookingCard(context, activeBooking);
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-              child: Text("Parking Spots Near You",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-          ),
-
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('parkings').snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
-              }
-
-              if (!snapshot.hasData) return const SliverToBoxAdapter(child: SizedBox());
-
-              var filteredDocs = snapshot.data!.docs.where((doc) {
-                var data = doc.data() as Map<String, dynamic>;
-                String name = (data['parkingName'] ?? "").toString().toLowerCase();
-                String address = (data['address'] ?? "").toString().toLowerCase();
-                return name.contains(_searchQuery.toLowerCase()) || address.contains(_searchQuery.toLowerCase());
-              }).toList();
-
-              return SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                      var doc = filteredDocs[index];
-                      var data = doc.data() as Map<String, dynamic>;
-                      return _buildParkingCard(context, data, doc.id); // doc.id එක මෙතනින් යවනවා
-                    },
-                    childCount: filteredDocs.length,
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 50, 20, 30),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade900,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-      ),
-      child: Column(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Hello Driver,", style: TextStyle(color: Colors.white70, fontSize: 16)),
-                  Text("Where to Park?", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              CircleAvatar(
-                radius: 25,
-                backgroundColor: Colors.white.withAlpha(50),
-                child: const Icon(Icons.person, color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 25),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: const InputDecoration(hintText: "Search by Area", border: InputBorder.none, icon: Icon(Icons.search)),
+            padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20, right: 20),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF334155)]),
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
+            ),
+            child: Row(
+              children: [
+                const CircleAvatar(radius: 40, backgroundColor: Colors.white24, child: Icon(Icons.person, size: 50, color: Colors.white)),
+                const SizedBox(width: 20),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(user?.email?.split('@')[0].toUpperCase() ?? "DRIVER", style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  const Text("Premium Member", style: TextStyle(color: Colors.cyanAccent, fontSize: 12)),
+                ]),
+              ],
             ),
           ),
+          const SizedBox(height: 20),
+          _profileMenu("My Wallet", Icons.account_balance_wallet, Colors.green, () {}),
+          _profileMenu("Booking History", Icons.history, Colors.blue, () {}),
+          _profileMenu("Support", Icons.help_outline, Colors.orange, () {}),
+          const Divider(),
+          _profileMenu("Logout", Icons.logout, Colors.red, () async {
+            await FirebaseAuth.instance.signOut();
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildParkingCard(BuildContext context, Map<String, dynamic> parking, String docId) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DriverBookingScreen(
-            parkingData: parking,
-            parkingId: docId, // නිවැරදිව required parameter එක මෙතන දෙනවා
-          ),
-        ),
-      ),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          children: [
-            Container(height: 120, decoration: const BoxDecoration(borderRadius: BorderRadius.vertical(top: Radius.circular(20)), image: DecorationImage(image: NetworkImage('https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=1000'), fit: BoxFit.cover))),
-            ListTile(
-              title: Text(parking['parkingName'] ?? "Parking", style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(parking['address'] ?? "Address"),
-              trailing: Text("LKR ${parking['pricing']?['firstHour'] ?? '0'}", style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
+  Widget _profileMenu(String title, IconData icon, Color color, VoidCallback tap) {
+    return ListTile(
+      leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: tap,
     );
   }
+}
 
-  Widget _buildActiveBookingCard(BuildContext context, QueryDocumentSnapshot booking) {
+// --- COMMON PARKING LIST LOGIC ---
+Widget _buildParkingList(String? cityQuery) {
+  Query query = FirebaseFirestore.instance.collection('parkings');
+
+  // Jar city search kela asel tar
+  if (cityQuery != null && cityQuery.isNotEmpty) {
+    query = query.where('city', isEqualTo: cityQuery);
+  }
+
+  return StreamBuilder<QuerySnapshot>(
+    stream: query.snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      if (snapshot.data!.docs.isEmpty) return const Center(child: Text("No parking found in this city."));
+
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: snapshot.data!.docs.length,
+        itemBuilder: (context, index) {
+          var pData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+          return _ParkingCard(pData: pData);
+        },
+      );
+    },
+  );
+}
+
+class _ParkingCard extends StatelessWidget {
+  final Map<String, dynamic> pData;
+  const _ParkingCard({required this.pData});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.orange.shade800, Colors.orange.shade500]), borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        leading: const Icon(Icons.timer, color: Colors.white, size: 35),
-        title: const Text("Active Booking!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: const Text("Tap to view timer", style: TextStyle(color: Colors.white70)),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ActiveBookingStatusScreen(bookingId: booking.id))),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+      child: Row(
+        children: [
+          const Icon(Icons.local_parking, color: Colors.blueAccent, size: 40),
+          const SizedBox(width: 15),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(pData['parkingName'] ?? "Parking", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(pData['city'] ?? "Location", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ])),
+          Text("LKR ${pData['pricePerHour']}/hr", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }

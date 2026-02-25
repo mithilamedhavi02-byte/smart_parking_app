@@ -1,308 +1,210 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'admin_dashboard.dart'; // Admin Dashboard එක තියෙන file එක
-import 'driver_dashboard.dart'; // Driver Dashboard එක තියෙන file එක
+import 'package:flutter/material.dart';
+
+// පහත imports නිවැරදිව තියෙන්න ඕනේ
+import 'admin_dashboard.dart';
+import 'driver_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool isDriver = true;
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+
+  bool _isLogin = true;
+  String _selectedRole = 'driver'; // 'driver' හෝ 'admin'
   bool _isLoading = false;
 
-  // --- LOGIN FUNCTION ---
-  Future<void> _handleLogin() async {
+  // --- පිරිසිදු කරන ලද Navigation Method එක ---
+  void _navigate(String role) {
+    // මෙතනදී Widget එකක් බව නිශ්චිතවම පවසනවා (Object error එක නැති කිරීමට)
+    Widget nextScreen;
+
+    if (role == 'owner') {
+      nextScreen = const AdminDashboard();
+    } else {
+      nextScreen = const DriverDashboard();
+    }
+
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => nextScreen)
+    );
+  }
+
+  Future<void> _processAuth() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showError("කරුණාකර සියලු විස්තර ඇතුළත් කරන්න.");
+      _showMsg("කරුණාකර සියලු විස්තර ඇතුළත් කරන්න", Colors.red);
       return;
     }
 
     setState(() => _isLoading = true);
+
     try {
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      if (_isLogin) {
+        // --- LOGIN ---
+        UserCredential userCred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      // Firestore එකේ අදාළ Collection එක පරීක්ෂා කිරීම
-      String collection = isDriver ? 'drivers' : 'admins';
-      var doc = await FirebaseFirestore.instance.collection(collection).doc(userCredential.user!.uid).get();
+        String uid = userCred.user!.uid;
 
-      if (doc.exists) {
-        if (!mounted) return;
-        _navigateToDashboard();
+        if (_selectedRole == 'admin') {
+          var adminDoc = await FirebaseFirestore.instance.collection('admins').doc(uid).get();
+          if (adminDoc.exists) {
+            _navigate('owner');
+          } else {
+            await FirebaseAuth.instance.signOut();
+            _showMsg("Admin ගිණුමක් හමු නොවීය!", Colors.orange);
+          }
+        } else {
+          var driverDoc = await FirebaseFirestore.instance.collection('drivers').doc(uid).get();
+          if (driverDoc.exists) {
+            _navigate('driver');
+          } else {
+            await FirebaseAuth.instance.signOut();
+            _showMsg("Driver ගිණුමක් හමු නොවීය!", Colors.orange);
+          }
+        }
       } else {
-        await FirebaseAuth.instance.signOut();
-        _showError("ඔබ තෝරාගත් අංශයේ (Account Type) මෙම ගිණුම නොමැත.");
+        // --- REGISTER ---
+        UserCredential userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
+        String uid = userCred.user!.uid;
+        String collection = (_selectedRole == 'admin') ? 'admins' : 'drivers';
+
+        await FirebaseFirestore.instance.collection(collection).doc(uid).set({
+          'uid': uid,
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'role': (_selectedRole == 'admin') ? 'owner' : 'driver',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        _showMsg("ලියාපදිංචිය සාර්ථකයි!", Colors.green);
+        setState(() => _isLogin = true);
       }
     } on FirebaseAuthException catch (e) {
-      _showError(_getAuthErrorMessage(e.code));
+      _showMsg("දෝෂයකි: ${e.message}", Colors.red);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _navigateToDashboard() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => isDriver ? const DriverDashboard() : const AdminDashboard()),
-          (route) => false,
-    );
-  }
-
-  String _getAuthErrorMessage(String code) {
-    switch (code) {
-      case 'user-not-found': return "මෙම ඊමේල් ලිපිනයට අදාළ ගිණුමක් නොමැත.";
-      case 'wrong-password': return "මුද්‍රිත රහස් පදය (Password) වැරදියි.";
-      case 'invalid-email': return "ඊමේල් ලිපිනය නිවැරදි නැත.";
-      default: return "Login අසාර්ථකයි. කරුණාකර නැවත උත්සාහ කරන්න.";
-    }
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.redAccent)
-    );
+  void _showMsg(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(30),
-          child: Column(
-            children: [
-              const SizedBox(height: 50),
-              const Icon(Icons.local_parking_rounded, color: Color(0xFF2B65A3), size: 80),
-              const Text("Smart Parking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: Color(0xFF2B65A3))),
-              const SizedBox(height: 40),
-              // Role Selection Tabs
-              Row(
-                children: [
-                  _buildRoleTab("Driver", isDriver, () => setState(() => isDriver = true)),
-                  _buildRoleTab("Admin", !isDriver, () => setState(() => isDriver = false)),
-                ],
-              ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Padding(padding: const EdgeInsets.all(30), child: Column(children: [
+              _buildRoleSelector(),
               const SizedBox(height: 30),
-              buildModernField("Email", Icons.email_outlined, _emailController, TextInputType.emailAddress),
-              buildModernField("Password", Icons.lock_outline, _passwordController, TextInputType.text, isPass: true),
-              const SizedBox(height: 25),
-              buildMainButton(isDriver ? "Driver Login" : "Admin Login", _isLoading ? null : _handleLogin, _isLoading),
-              const SizedBox(height: 20),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(
-                      builder: (context) => isDriver ? const DriverRegisterScreen() : const AdminRegisterScreen()
-                  ));
-                },
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(color: Colors.grey),
-                    children: [
-                      const TextSpan(text: "Don't have an account? "),
-                      TextSpan(text: "Register Now", style: TextStyle(color: const Color(0xFF2B65A3), fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              )
-            ],
-          ),
+              if (!_isLogin) ...[
+                _buildInput(_nameController, "සම්පූර්ණ නම", Icons.person),
+                const SizedBox(height: 15),
+                _buildInput(_phoneController, "දුරකථන අංකය", Icons.phone),
+                const SizedBox(height: 15),
+              ],
+              _buildInput(_emailController, "ඊමේල් ලිපිනය", Icons.email),
+              const SizedBox(height: 15),
+              _buildInput(_passwordController, "මුරපදය", Icons.lock, hide: true),
+              const SizedBox(height: 40),
+              _isLoading ? const CircularProgressIndicator() : _buildSubmitBtn(),
+              const SizedBox(height: 15),
+              _buildToggleBtn(),
+            ])),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildRoleTab(String label, bool isSelected, VoidCallback onTap) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
+  Widget _buildHeader() {
+    return Container(
+      height: 230, width: double.infinity,
+      decoration: const BoxDecoration(
+          color: Color(0xFF0D47A1),
+          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(80))
+      ),
+      child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(Icons.local_parking, size: 70, color: Colors.white),
+        SizedBox(height: 10),
+        Text("PARK-PRO", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+      ]),
+    );
+  }
+
+  Widget _buildRoleSelector() {
+    return Row(children: [
+      _roleTab("driver", Icons.directions_car, "Driver"),
+      const SizedBox(width: 15),
+      _roleTab("admin", Icons.admin_panel_settings, "Admin (Owner)"),
+    ]);
+  }
+
+  Widget _roleTab(String role, IconData icon, String label) {
+    bool sel = _selectedRole == role;
+    return Expanded(child: GestureDetector(
+        onTap: () => setState(() => _selectedRole = role),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: isSelected ? const Color(0xFF2B65A3) : Colors.transparent, width: 3))
-          ),
-          child: Center(child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? const Color(0xFF2B65A3) : Colors.grey, fontSize: 16))),
-        ),
-      ),
+          decoration: BoxDecoration(color: sel ? const Color(0xFF0D47A1) : Colors.grey.shade100, borderRadius: BorderRadius.circular(15)),
+          child: Column(children: [
+            Icon(icon, color: sel ? Colors.white : Colors.grey),
+            Text(label, style: TextStyle(color: sel ? Colors.white : Colors.grey, fontWeight: FontWeight.bold))
+          ]),
+        )
+    ));
+  }
+
+  Widget _buildInput(TextEditingController c, String l, IconData i, {bool hide = false}) {
+    return TextField(
+        controller: c,
+        obscureText: hide,
+        decoration: InputDecoration(
+            labelText: l,
+            prefixIcon: Icon(i),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))
+        )
+    );
+  }
+
+  Widget _buildSubmitBtn() {
+    return SizedBox(width: double.infinity, height: 55, child: ElevatedButton(
+      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+      onPressed: _processAuth,
+      child: Text(_isLogin ? "LOGIN" : "REGISTER", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+    ));
+  }
+
+  Widget _buildToggleBtn() {
+    return TextButton(
+        onPressed: () => setState(() => _isLogin = !_isLogin),
+        child: Text(_isLogin ? "Don't have an account? Register" : "Already have an account? Login")
     );
   }
 }
 
-// --- DRIVER REGISTER SCREEN ---
-class DriverRegisterScreen extends StatefulWidget {
-  const DriverRegisterScreen({super.key});
-  @override
-  State<DriverRegisterScreen> createState() => _DriverRegisterScreenState();
-}
-
-class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-
-  Future<void> _register() async {
-    if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("සියලු විස්තර පුරවන්න.")));
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      UserCredential user = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      await FirebaseFirestore.instance.collection('drivers').doc(user.user!.uid).set({
-        'uid': user.user!.uid,
-        'name': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'role': 'driver',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const DriverDashboard()), (route) => false);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("දෝෂයකි: ${e.toString()}")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Driver Registration"), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          children: [
-            buildModernField("Full Name", Icons.person, _nameController, TextInputType.name),
-            buildModernField("Email", Icons.email, _emailController, TextInputType.emailAddress),
-            buildModernField("Password", Icons.lock, _passwordController, TextInputType.text, isPass: true),
-            const SizedBox(height: 30),
-            buildMainButton("Register as Driver", _isLoading ? null : _register, _isLoading),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --- ADMIN REGISTER SCREEN ---
-class AdminRegisterScreen extends StatefulWidget {
-  const AdminRegisterScreen({super.key});
-  @override
-  State<AdminRegisterScreen> createState() => _AdminRegisterScreenState();
-}
-
-class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-
-  Future<void> _register() async {
-    if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("සියලු විස්තර පුරවන්න.")));
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      UserCredential user = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      // Firestore එකේ 'admins' collection එකට දත්ත යැවීම
-      await FirebaseFirestore.instance.collection('admins').doc(user.user!.uid).set({
-        'uid': user.user!.uid,
-        'name': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'role': 'admin',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-
-      // වැදගත්: මෙතන AdminDashboard() එකටම යනවාද බලන්න
-      Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminDashboard()),
-              (route) => false
-      );
-
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Admin Registration"), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          children: [
-            buildModernField("Full Name", Icons.person, _nameController, TextInputType.name),
-            buildModernField("Email", Icons.email, _emailController, TextInputType.emailAddress),
-            buildModernField("Password", Icons.lock, _passwordController, TextInputType.text, isPass: true),
-            const SizedBox(height: 30),
-            buildMainButton("Register as Admin", _isLoading ? null : _register, _isLoading, color: Colors.indigo),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --- HELPER WIDGETS ---
-Widget buildModernField(String hint, IconData icon, TextEditingController controller, TextInputType type, {bool isPass = false}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 15),
-    child: TextField(
-      controller: controller,
-      obscureText: isPass,
-      keyboardType: type,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: const Color(0xFF2B65A3)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        filled: true,
-        fillColor: Colors.blue.withOpacity(0.05),
-      ),
-    ),
-  );
-}
-
-Widget buildMainButton(String label, VoidCallback? onPressed, bool isLoading, {Color color = const Color(0xFF2B65A3)}) {
-  return SizedBox(
-    width: double.infinity,
-    height: 55,
-    child: ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 2,
-      ),
-      child: isLoading
-          ? const CircularProgressIndicator(color: Colors.white)
-          : Text(label, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-    ),
-  );
-}
+// ❌ මචං, මම ඔයා යටින්ම ලියලා තිබුණු හිස් "class DriverDashboard" එක අයින් කළා.
+// ඒක තමයි "Ambiguous Import" error එකට හේතුව.
+// DriverDashboard එක තියෙන්න ඕනේ වෙනම ෆයිල් එකක් වන 'driver_dashboard.dart' එකේ විතරයි.

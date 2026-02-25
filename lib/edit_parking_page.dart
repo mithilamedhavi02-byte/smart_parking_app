@@ -1,22 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class AdminAddParking extends StatefulWidget {
-  const AdminAddParking({super.key});
+class EditParkingPage extends StatefulWidget {
+  final String parkingId;
+  final Map<String, dynamic> currentData;
+
+  const EditParkingPage({super.key, required this.parkingId, required this.currentData});
+
   @override
-  State<AdminAddParking> createState() => _AdminAddParkingState();
+  State<EditParkingPage> createState() => _EditParkingPageState();
 }
 
-class _AdminAddParkingState extends State<AdminAddParking> {
+class _EditParkingPageState extends State<EditParkingPage> {
   final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _address = TextEditingController();
-  final _rateFirst = TextEditingController();
-  final _rateExtra = TextEditingController();
-  final _rateFullDay = TextEditingController();
-
   bool _isLoading = false;
+
+  // Controllers කලින්ම initialize කරනවා LateInitializationError මඟහරින්න
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _address = TextEditingController();
+  final TextEditingController _rateFirst = TextEditingController();
+  final TextEditingController _rateExtra = TextEditingController();
+  final TextEditingController _rateFullDay = TextEditingController();
 
   final Map<String, TextEditingController> _vehicleControllers = {
     'Car': TextEditingController(text: '0'),
@@ -27,38 +31,58 @@ class _AdminAddParkingState extends State<AdminAddParking> {
     'Tuk-Tuk': TextEditingController(text: '0'),
   };
 
-  void saveParking() async {
+  @override
+  void initState() {
+    super.initState();
+    _fillExistingData();
+  }
+
+  void _fillExistingData() {
+    // Basic Info
+    _name.text = widget.currentData['parkingName']?.toString() ?? "";
+    _address.text = widget.currentData['address']?.toString() ?? "";
+
+    // Pricing (Null check එකක් දාලා ආරක්ෂිතව අගයන් ගන්නවා)
+    final prices = widget.currentData['prices'] as Map<String, dynamic>? ?? {};
+    _rateFirst.text = (prices['firstHour'] ?? '0').toString();
+    _rateExtra.text = (prices['extraHour'] ?? '0').toString();
+    _rateFullDay.text = (prices['fullDay'] ?? '0').toString();
+
+    // Capacity (Vehicle Grid)
+    final capacities = widget.currentData['capacity'] as Map<String, dynamic>? ?? {};
+    _vehicleControllers.forEach((key, controller) {
+      if (capacities.containsKey(key)) {
+        controller.text = capacities[key].toString();
+      }
+    });
+  }
+
+  void updateParking() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-
       Map<String, int> capacities = {};
       _vehicleControllers.forEach((key, controller) {
-        int val = int.tryParse(controller.text) ?? 0;
-        if (val > 0) capacities[key] = val;
+        capacities[key] = int.tryParse(controller.text) ?? 0;
       });
 
-      await FirebaseFirestore.instance.collection('parkings').add({
-        'adminId': uid,
+      await FirebaseFirestore.instance.collection('parkings').doc(widget.parkingId).update({
         'parkingName': _name.text.trim(),
         'address': _address.text.trim(),
         'capacity': capacities,
-        'currentFree': capacities,
-        'location': const GeoPoint(6.9271, 79.8612),
-        'rates': {
-          'firstHour': _rateFirst.text.trim(),
-          'extraHour': _rateExtra.text.trim(),
-          'fullDay': _rateFullDay.text.trim(),
+        'prices': {
+          'firstHour': double.tryParse(_rateFirst.text) ?? 0.0,
+          'extraHour': double.tryParse(_rateExtra.text) ?? 0.0,
+          'fullDay': double.tryParse(_rateFullDay.text) ?? 0.0,
         },
-        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Parking Registered Successfully! ✨"), backgroundColor: Colors.green),
+        const SnackBar(content: Text("Parking Details Updated! ✨"), backgroundColor: Colors.blue),
       );
     } catch (e) {
       if (mounted) {
@@ -68,13 +92,13 @@ class _AdminAddParkingState extends State<AdminAddParking> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  // ... build method එක කලින් තිබූ පරිදිම තබා ගන්න ...
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text("Register Parking", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Edit Parking Info", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.blue.shade900,
         foregroundColor: Colors.white,
       ),
@@ -107,20 +131,22 @@ class _AdminAddParkingState extends State<AdminAddParking> {
             ]),
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: saveParking,
+              onPressed: updateParking,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade900,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
-              child: const Text("REGISTER PARKING", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              child: const Text("UPDATE PARKING", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ],
         ),
       ),
     );
   }
+
+  // --- Helper Methods (ඔයාගේ Add Page එකේ UI එකමයි) ---
 
   Widget _buildSectionHeader(String title) => Padding(
     padding: const EdgeInsets.only(bottom: 8, top: 15),
@@ -133,7 +159,7 @@ class _AdminAddParkingState extends State<AdminAddParking> {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(15),
-      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
     ),
     child: Column(children: children),
   );

@@ -6,11 +6,7 @@ class DriverBookingScreen extends StatefulWidget {
   final Map<String, dynamic> parkingData;
   final String parkingId;
 
-  const DriverBookingScreen({
-    super.key,
-    required this.parkingData,
-    required this.parkingId,
-  });
+  const DriverBookingScreen({super.key, required this.parkingData, required this.parkingId});
 
   @override
   State<DriverBookingScreen> createState() => _DriverBookingScreenState();
@@ -18,29 +14,16 @@ class DriverBookingScreen extends StatefulWidget {
 
 class _DriverBookingScreenState extends State<DriverBookingScreen> {
   final _vehicleNoController = TextEditingController();
-
   String _selectedType = 'Car';
   bool _isLoading = false;
-  bool _termsAccepted = false;
-
-  final List<String> _vehicleTypes = [
-    'Car',
-    'Bike',
-    'Van',
-    'Bus',
-    'Lorry',
-    'Tuk-Tuk',
-    'Electric Car'
-  ];
 
   void _confirmBooking() async {
-    if (_vehicleNoController.text.trim().isEmpty) {
-      _showSnackBar("Please enter vehicle number", Colors.red);
-      return;
-    }
+    String vehicleNo = _vehicleNoController.text.trim().toUpperCase();
 
-    if (!_termsAccepted) {
-      _showSnackBar("Please accept terms", Colors.red);
+    if (vehicleNo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter vehicle number"), backgroundColor: Colors.red),
+      );
       return;
     }
 
@@ -48,152 +31,96 @@ class _DriverBookingScreenState extends State<DriverBookingScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
+      DateTime now = DateTime.now();
 
-      /// ✅ GET ID FROM CONSTRUCTOR (FINAL FIX)
-      String parkingDocId = widget.parkingId;
-
-      DocumentReference parkingRef = FirebaseFirestore.instance
-          .collection('parkings')
-          .doc(parkingDocId);
-
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final parkingSnapshot = await transaction.get(parkingRef);
-
-        if (!parkingSnapshot.exists) {
-          throw "Parking not found";
-        }
-
-        Map<String, dynamic> pData =
-        parkingSnapshot.data() as Map<String, dynamic>;
-
-        Map<String, dynamic> currentFree =
-        Map<String, dynamic>.from(pData['currentFree'] ?? {});
-
-        int available = (currentFree[_selectedType] ?? 0);
-
-        if (available <= 0) {
-          throw "No slots available for $_selectedType";
-        }
-
-        /// reduce slot
-        currentFree[_selectedType] = available - 1;
-
-        transaction.update(parkingRef, {
-          'currentFree': currentFree,
-        });
-
-        /// create booking
-        DocumentReference bookingRef =
-        FirebaseFirestore.instance.collection('bookings').doc();
-
-        transaction.set(bookingRef, {
-          'driverId': user?.uid,
-          'parkingId': parkingDocId,
-          'parkingName': pData['parkingName'],
-          'vehicleNumber':
-          _vehicleNoController.text.trim().toUpperCase(),
-          'vehicleType': _selectedType,
-          'status': 'confirmed',
-          'bookingTime': FieldValue.serverTimestamp(),
-        });
+      // අලුත් Booking Record එකක් සාදයි
+      await FirebaseFirestore.instance.collection('bookings').add({
+        'driverId': user?.uid,
+        'parkingId': widget.parkingId,
+        'parkingName': widget.parkingData['parkingName'],
+        'vehicleNumber': vehicleNo,
+        'vehicleType': _selectedType,
+        'status': 'pending', // Admin ට පෙනීමට 'pending' විය යුතුය
+        'createdAt': FieldValue.serverTimestamp(),
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
-      _showSnackBar("Booking Successful!", Colors.green);
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Booking Request Sent!"), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
-      _showSnackBar(e.toString(), Colors.red);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    setState(() => _isLoading = false);
-  }
-
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentFree =
-    widget.parkingData['currentFree'] as Map<String, dynamic>?;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Confirm Booking"),
-        foregroundColor: Colors.blue.shade900,
+        title: const Text("Book Parking Slot"),
+        backgroundColor: Colors.blue.shade900,
+        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(25),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// parking name
             Text(
-              widget.parkingData['parkingName'] ?? "Parking",
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.bold),
+              widget.parkingData['parkingName'] ?? "Parking Space",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 10),
+            Text(widget.parkingData['address'] ?? "", style: const TextStyle(color: Colors.grey)),
+            const Divider(height: 40),
 
-            const SizedBox(height: 20),
+            const Text("Vehicle Details", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
 
-            /// vehicle number
             TextField(
               controller: _vehicleNoController,
-              decoration: const InputDecoration(
-                labelText: "Vehicle Number",
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: "Vehicle Number (e.g. CAB-1234)",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.directions_car),
               ),
-              textCapitalization: TextCapitalization.characters,
             ),
-
             const SizedBox(height: 20),
 
-            /// vehicle type dropdown
-            DropdownButtonFormField(
+            DropdownButtonFormField<String>(
               value: _selectedType,
-              items: _vehicleTypes
-                  .map((type) => DropdownMenuItem(
-                value: type,
-                child: Text(
-                  "$type  (Free: ${currentFree?[type] ?? 0})",
-                ),
-              ))
-                  .toList(),
-              onChanged: (value) {
-                setState(() => _selectedType = value.toString());
-              },
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
                 labelText: "Vehicle Type",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              items: ['Car', 'Bike', 'Van', 'Bus', 'Lorry', 'Tuk-Tuk']
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedType = v!),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
 
-            /// terms
-            CheckboxListTile(
-              value: _termsAccepted,
-              onChanged: (v) => setState(() => _termsAccepted = v!),
-              title: const Text("I agree to terms and conditions"),
-              controlAffinity: ListTileControlAffinity.leading,
-            ),
-
-            const SizedBox(height: 20),
-
-            /// button
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade900,
-                minimumSize: const Size(double.infinity, 55),
-              ),
-              onPressed: _confirmBooking,
-              child: const Text(
-                "CONFIRM & GET QR",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _confirmBooking,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade900,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text("SEND REQUEST", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             ),
           ],

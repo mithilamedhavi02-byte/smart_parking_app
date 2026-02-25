@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class AdminManageBookings extends StatefulWidget {
@@ -9,188 +10,142 @@ class AdminManageBookings extends StatefulWidget {
 }
 
 class _AdminManageBookingsState extends State<AdminManageBookings> {
+  final String? currentAdminUid = FirebaseAuth.instance.currentUser?.uid;
 
-  // 1. විනාඩි 15 ඉක්මවා ගිය බුකින්ස් පරීක්ෂා කර Auto-Cancel කරන ලොජික් එක
-  void _checkAutoCancel(List<QueryDocumentSnapshot> docs) {
-    DateTime now = DateTime.now();
-
-    for (var doc in docs) {
-      var data = doc.data() as Map<String, dynamic>;
-      // Status එක pending නම් පමණක් පරීක්ෂා කරයි
-      if (data['status'] == 'pending' && data['timestamp'] != null) {
-        DateTime bookingTime = (data['timestamp'] as Timestamp).toDate();
-
-        // දැන් වේලාව සහ බුකින් වේලාව අතර වෙනස විනාඩි 15 ට වඩා වැඩිද?
-        if (now.difference(bookingTime).inMinutes >= 15) {
-          FirebaseFirestore.instance.collection('bookings').doc(doc.id).update({
-            'status': 'expired',
-          });
-        }
-      }
-    }
-  }
-
-  // 2. බුකින් එකක් Confirm කරන විට Slot එකක් අඩු කිරීම (Transaction ලොජික් එක)
-  Future<void> _confirmBooking(String bookingId, String parkingId, String vehicleType) async {
-    final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
-    final parkingRef = FirebaseFirestore.instance.collection('parkings').doc(parkingId);
+  // --- Confirm Logic: මෙය තමයි බොත්තම එබූ විට ක්‍රියාත්මක වන්නේ ---
+  Future<void> _confirmArrival(String bookingId, String parkingId, String vehicleType) async {
+    // 1. Loading Dialog එකක් පෙන්වමු
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
+      final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
+      final parkingRef = FirebaseFirestore.instance.collection('parkings').doc(parkingId);
+
+      // 2. Transaction එකක් හරහා දත්ත ආරක්ෂිතව update කරමු
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         DocumentSnapshot parkingSnap = await transaction.get(parkingRef);
 
-        if (!parkingSnap.exists) return;
+        if (!parkingSnap.exists) {
+          throw Exception("Parking place not found!");
+        }
 
-        Map<String, dynamic> currentFree = Map<String, dynamic>.from(parkingSnap['currentFree']);
+        Map<String, dynamic> currentFree = Map<String, dynamic>.from(parkingSnap['currentFree'] ?? {});
 
-        // අදාළ වාහන වර්ගයට ඉඩ තිබේදැයි බැලීම
-        if (currentFree.containsKey(vehicleType) && currentFree[vehicleType] > 0) {
-          currentFree[vehicleType] -= 1; // ඉතිරි ඉඩ ප්‍රමාණයෙන් එකක් අඩු කරයි
+        // Slot එකක් තිබේදැයි බලමු
+        if (currentFree.containsKey(vehicleType) && (currentFree[vehicleType] ?? 0) > 0) {
+          currentFree[vehicleType] -= 1; // එකක් අඩු කරයි
 
-          transaction.update(bookingRef, {'status': 'confirmed'});
+          // --- මෙතන තමයි වැදගත්ම වෙනස කළේ ---
+          transaction.update(bookingRef, {
+            'status': 'parked',
+            'checkInTime': FieldValue.serverTimestamp(), // කාලය ගණනය කිරීමට මෙය අත්‍යවශ්‍යයි
+          });
+
+          // Parking එකේ slots ප්‍රමාණය update කරයි
           transaction.update(parkingRef, {'currentFree': currentFree});
         } else {
-          // ඉඩ නැතිනම් Error එකක් පෙන්වීමට SnackBar එකක් පාවිච්චි කළ හැක
-          throw "No available slots for $vehicleType";
+          throw Exception("No free slots available for $vehicleType");
         }
       });
 
-      if(mounted) {
+      if (mounted) {
+        Navigator.pop(context); // Loading එක අයින් කරන්න
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Booking Confirmed & Slot Updated!"), backgroundColor: Colors.green)
+          const SnackBar(content: Text("Arrival Confirmed!"), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
-      if(mounted) {
+      if (mounted) {
+        Navigator.pop(context); // Loading එක අයින් කරන්න
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red)
+          SnackBar(content: Text("Error: ${e.toString()}"), backgroundColor: Colors.red),
         );
       }
+      debugPrint("Confirm Error: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: const Text("Manage Bookings", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("ARRIVAL REQUESTS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: Colors.orange.shade800,
         foregroundColor: Colors.white,
-        elevation: 0,
+        centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('bookings')
-            .orderBy('timestamp', descending: true)
+            .collection('parkings')
+            .where('adminId', isEqualTo: currentAdminUid)
             .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Something went wrong"));
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+        builder: (context, parkSnap) {
+          if (parkSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+
+          if (!parkSnap.hasData || parkSnap.data!.docs.isEmpty) {
+            return const Center(child: Text("No Parking Registered for this Admin"));
           }
 
-          // දත්ත ලැබුණු පසු Expired ඒවා තිබේදැයි පරීක්ෂා කරයි
-          _checkAutoCancel(snapshot.data!.docs);
+          String myParkingId = parkSnap.data!.docs.first.id;
 
-          if (snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No booking requests available."));
-          }
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('bookings')
+                .where('parkingId', isEqualTo: myParkingId)
+                .where('status', isEqualTo: 'pending')
+                .snapshots(),
+            builder: (context, bookingSnap) {
+              if (bookingSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              var booking = snapshot.data!.docs[index];
-              var data = booking.data() as Map<String, dynamic>;
-              String status = data['status'] ?? 'pending';
-              DateTime bookingTime = (data['timestamp'] as Timestamp).toDate();
+              if (!bookingSnap.hasData || bookingSnap.data!.docs.isEmpty) {
+                return const Center(child: Text("No new requests. Waiting for arrivals..."));
+              }
 
-              int minutesPassed = DateTime.now().difference(bookingTime).inMinutes;
-              int timeLeft = 15 - minutesPassed;
+              return ListView.builder(
+                padding: const EdgeInsets.all(10),
+                itemCount: bookingSnap.data!.docs.length,
+                itemBuilder: (context, index) {
+                  var doc = bookingSnap.data!.docs[index];
+                  var data = doc.data() as Map<String, dynamic>;
 
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
+                  return Card(
+                    elevation: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: ListTile(
                         leading: CircleAvatar(
-                          radius: 25,
-                          backgroundColor: _getStatusColor(status).withValues(alpha: 0.1),
-                          child: Icon(_getStatusIcon(status), color: _getStatusColor(status)),
+                          backgroundColor: Colors.orange.shade100,
+                          child: Icon(Icons.directions_car, color: Colors.orange.shade800),
                         ),
                         title: Text(
-                          "Vehicle: ${data['vehicleType']}",
+                          data['vehicleNumber'] ?? "UNKNOWN",
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                         ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 5),
-                            Text("Status: ${status.toUpperCase()}", style: TextStyle(color: _getStatusColor(status), fontWeight: FontWeight.w600)),
-                            Text("Booked at: ${bookingTime.toString().substring(11, 16)}"),
-                          ],
+                        subtitle: Text("Vehicle: ${data['vehicleType']}"),
+                        trailing: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _confirmArrival(doc.id, myParkingId, data['vehicleType']),
+                          child: const Text("CONFIRM"),
                         ),
-                        trailing: (status == 'pending' && timeLeft > 0)
-                            ? Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
-                          child: Text("${timeLeft}m left", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                        )
-                            : null,
                       ),
-
-                      if (status == 'pending') ...[
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => FirebaseFirestore.instance.collection('bookings').doc(booking.id).update({'status': 'cancelled'}),
-                              icon: const Icon(Icons.cancel, color: Colors.red),
-                              label: const Text("Reject", style: TextStyle(color: Colors.red)),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton.icon(
-                              onPressed: () => _confirmBooking(booking.id, data['parkingId'], data['vehicleType']),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                              icon: const Icon(Icons.check_circle),
-                              label: const Text("Confirm Arrival"),
-                            ),
-                          ],
-                        )
-                      ]
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               );
             },
           );
         },
       ),
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'confirmed': return Colors.green;
-      case 'cancelled':
-      case 'expired': return Colors.red;
-      default: return Colors.orange;
-    }
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'confirmed': return Icons.verified;
-      case 'cancelled':
-      case 'expired': return Icons.error;
-      default: return Icons.hourglass_top;
-    }
   }
 }

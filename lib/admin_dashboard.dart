@@ -1,352 +1,582 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'admin_add_parking.dart';
 
-// =============================================================
-// 1. MAIN DASHBOARD - ව්‍යාපාරික විශ්ලේෂණ සහිතව
-// =============================================================
-class AdminDashboard extends StatelessWidget {
+// Pages - ඔයාගේ ෆයිල් වල නම් නිවැරදිද බලන්න
+import 'active_vehicles_page.dart';
+import 'admin_manage_bookings.dart';
+import 'admin_add_parking.dart';
+import 'settings_page.dart';
+
+class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+  State<AdminDashboard> createState() => _AdminDashboardState();
+}
 
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        title: const Text("Admin Dashboard", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.blue.shade900,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout_rounded))
-        ],
+class _AdminDashboardState extends State<AdminDashboard> {
+  final String? adminUid = FirebaseAuth.instance.currentUser?.uid;
+
+  // Revenue පෙන්වන Modal එක - Modernized
+  void _showDailyRevenue() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(32),
+        height: 280,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Color(0xFFF8FAFC)],
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Daily Revenue",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const Divider(thickness: 1, height: 30),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    "LKR 12,450.00",
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF059669),
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Total for Today",
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text("Close"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+
+      // 1. CENTER (+) BUTTON - Modern Style
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminAddParking()),
+        ),
+        backgroundColor: const Color(0xFF3B82F6),
+        elevation: 4,
+        shape: const CircleBorder(),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3B82F6).withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 30,
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+      // 2. BOTTOM NAVIGATION BAR - Modern Glass Morphism
+      bottomNavigationBar: BottomAppBar(
+        color: Colors.white,
+        elevation: 8,
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        child: Container(
+          height: 65,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, "Home", true),
+              _buildNavItem(Icons.bar_chart_rounded, "Revenue", false, onTap: _showDailyRevenue),
+              const SizedBox(width: 40), // Space for FAB
+              _buildNavItem(Icons.map_outlined, "Bookings", false, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminManageBookings()))),
+              _buildNavItem(Icons.settings_outlined, "Settings", false, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()))),
+            ],
+          ),
+        ),
+      ),
+
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('parkings').where('adminId', isEqualTo: uid).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('parkings')
+            .where('adminId', isEqualTo: adminUid)
+            .snapshots(),
         builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF3B82F6),
+              ),
+            );
+          }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No Parking Registered. Please add one in settings."));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.local_parking,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "No Parking Data Found",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Add a parking to get started",
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
-          var doc = snapshot.data!.docs.first;
-          Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          String pId = doc.id;
+          var parkingId = snapshot.data!.docs.first.id;
+          var pData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("INCOME ANALYTICS", style: TextStyle(fontWeight: FontWeight.w800, color: Colors.blueGrey, letterSpacing: 1.2)),
-                const SizedBox(height: 15),
-                _buildAdvancedStats(pId),
+          return CustomScrollView(
+            slivers: [
+              _buildHeader(pData),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- REAL-TIME UPDATING BAR ---
+                      _buildOccupancyCard(parkingId, pData),
 
-                const SizedBox(height: 35),
-                const Text("MANAGEMENT", style: TextStyle(fontWeight: FontWeight.w800, color: Colors.blueGrey, letterSpacing: 1.2)),
-                const SizedBox(height: 15),
+                      const SizedBox(height: 30),
 
-                _largeMenuButton(
-                    context,
-                    "MANAGE VEHICLES",
-                    "View, Search & Check-out vehicles",
-                    Icons.manage_search_rounded,
-                    Colors.blue.shade800,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => AdminVehicleSummary(parkingData: data, parkingId: pId)))
+                      // Section Title with decoration
+                      _buildSectionTitle("Quick Actions"),
+                      const SizedBox(height: 20),
+
+                      // QUICK ACTIONS (Arrivals & Live List) - Modern Cards
+                      Row(
+                        children: [
+                          _buildActionCard(
+                            "Arrivals",
+                            Icons.exit_to_app_rounded,
+                            const Color(0xFF4F46E5),
+                            const AdminManageBookings(),
+                          ),
+                          const SizedBox(width: 16),
+                          _buildActionCard(
+                            "Live List",
+                            Icons.list_alt_rounded,
+                            const Color(0xFF059669),
+                            ActiveVehiclesPage(parkingId: parkingId, fullData: pData),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 35),
+
+                      _buildSectionTitle("Operational Health"),
+                      const SizedBox(height: 20),
+
+                      _buildOperationalHealth(),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
                 ),
-
-                const SizedBox(height: 15),
-                _largeMenuButton(
-                    context,
-                    "PARKING SETTINGS",
-                    "Update slots, prices & location",
-                    Icons.settings_suggest_rounded,
-                    Colors.blueGrey,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminAddParking()))
-                ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildAdvancedStats(String pId) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('bookings')
-          .where('parkingId', isEqualTo: pId)
-          .where('status', isEqualTo: 'completed').snapshots(),
-      builder: (context, snapshot) {
-        double todayIncome = 0;
-        double weeklyIncome = 0;
-        double monthlyIncome = 0;
-
-        DateTime now = DateTime.now();
-        DateTime todayStart = DateTime(now.year, now.month, now.day);
-        DateTime weekStart = now.subtract(Duration(days: now.weekday - 1));
-        DateTime monthStart = DateTime(now.year, now.month, 1);
-
-        if (snapshot.hasData) {
-          for (var doc in snapshot.data!.docs) {
-            Map<String, dynamic> bData = doc.data() as Map<String, dynamic>;
-            double bill = (bData['totalBill'] ?? 0).toDouble();
-            DateTime checkoutDate = (bData['checkOutTime'] as Timestamp).toDate();
-
-            if (checkoutDate.isAfter(todayStart)) todayIncome += bill;
-            if (checkoutDate.isAfter(weekStart)) weeklyIncome += bill;
-            if (checkoutDate.isAfter(monthStart)) monthlyIncome += bill;
-          }
-        }
-
-        return Column(
-          children: [
-            _revenueCard("Today's Revenue", "LKR ${todayIncome.toStringAsFixed(0)}", Icons.payments_rounded, Colors.green.shade700),
-            const SizedBox(height: 15),
-            Row(
-              children: [
-                _smallStatCard("This Week", "LKR ${weeklyIncome.toStringAsFixed(0)}", Icons.calendar_view_week, Colors.blue),
-                const SizedBox(width: 15),
-                _smallStatCard("This Month", "LKR ${monthlyIncome.toStringAsFixed(0)}", Icons.analytics, Colors.orange),
-              ],
-            )
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _revenueCard(String title, String val, IconData icon, Color color) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [color, color.withAlpha(200)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: color.withAlpha(80), blurRadius: 15, offset: const Offset(0, 8))],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white, size: 40),
-          const SizedBox(height: 10),
-          Text(val, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
-          Text(title, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-        ],
-      ),
-    );
-  }
-
-  Widget _smallStatCard(String title, String val, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
-        child: Column(children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 5),
-          Text(val, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-        ]),
-      ),
-    );
-  }
-
-  Widget _largeMenuButton(BuildContext context, String title, String sub, IconData icon, Color color, VoidCallback onTap) {
+  // Modern Nav Item
+  Widget _buildNavItem(IconData icon, String label, bool isSelected, {VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(30),
       child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
-        child: Row(
-          children: [
-            CircleAvatar(backgroundColor: color.withAlpha(30), radius: 25, child: Icon(icon, color: color)),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(sub, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ]),
-            ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================
-// 2. VEHICLE SUMMARY PAGE
-// =============================================================
-class AdminVehicleSummary extends StatelessWidget {
-  final Map<String, dynamic> parkingData;
-  final String parkingId;
-  const AdminVehicleSummary({super.key, required this.parkingData, required this.parkingId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(title: const Text("Select Vehicle Type"), backgroundColor: Colors.blue.shade900, foregroundColor: Colors.white),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: parkingData['capacity'].keys.map<Widget>((type) {
-          return _buildCategoryCard(context, type, parkingData['capacity'][type], parkingData['currentFree'][type]);
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildCategoryCard(BuildContext context, String type, dynamic total, dynamic free) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 15),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.shade200)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(20),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AdminVehicleList(parkingId: parkingId, vehicleType: type, fullParkingData: parkingData))),
-        title: Text(type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-        subtitle: Text("Free Slots: $free / $total", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-        trailing: const Icon(Icons.chevron_right),
-      ),
-    );
-  }
-}
-
-// =============================================================
-// 3. VEHICLE LIST PAGE (Search + Filter + Checkout)
-// =============================================================
-class AdminVehicleList extends StatefulWidget {
-  final String parkingId;
-  final String vehicleType;
-  final Map<String, dynamic> fullParkingData;
-  const AdminVehicleList({super.key, required this.parkingId, required this.vehicleType, required this.fullParkingData});
-
-  @override
-  State<AdminVehicleList> createState() => _AdminVehicleListState();
-}
-
-class _AdminVehicleListState extends State<AdminVehicleList> {
-  String selectedFilter = 'all';
-  String searchQuery = "";
-  final TextEditingController _searchController = TextEditingController();
-
-  void _showCheckoutDialog(BuildContext context, DocumentSnapshot doc) {
-    var bData = doc.data() as Map<String, dynamic>;
-    Timestamp checkIn = bData['checkInTime'] ?? Timestamp.now();
-    DateTime now = DateTime.now();
-    Duration diff = now.difference(checkIn.toDate());
-    int hours = diff.inHours + (diff.inMinutes % 60 > 0 ? 1 : 0);
-    double bill = hours * 100.0;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Check-out Receipt"),
-        content: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(bData['vehicleNumber'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("Duration: $hours Hour(s)"),
-            const Divider(),
-            Text("LKR ${bill.toStringAsFixed(0)}", style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.green)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () async {
-              await doc.reference.update({'status': 'completed', 'checkOutTime': now, 'totalBill': bill});
-              Map<String, dynamic> currentFree = Map.from(widget.fullParkingData['currentFree']);
-              currentFree[widget.vehicleType] = (currentFree[widget.vehicleType] ?? 0) + 1;
-              await FirebaseFirestore.instance.collection('parkings').doc(widget.parkingId).update({'currentFree': currentFree});
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text("Release Vehicle"),
-          )
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(title: Text("${widget.vehicleType} Status"), backgroundColor: Colors.blue.shade900, foregroundColor: Colors.white),
-      body: Column(
-        children: [
-          // SEARCH BAR
-          Container(
-            padding: const EdgeInsets.all(15),
-            color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              onChanged: (val) => setState(() => searchQuery = val.toUpperCase()),
-              decoration: InputDecoration(
-                hintText: "Search Vehicle Number...",
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                filled: true,
-                fillColor: Colors.grey.shade100,
+            Icon(
+              icon,
+              color: isSelected ? const Color(0xFF3B82F6) : Colors.grey[500],
+              size: 24,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isSelected ? const Color(0xFF3B82F6) : Colors.grey[500],
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Modern Section Title
+  Widget _buildSectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(2),
           ),
-
-          // FILTERS
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-            child: Row(children: [
-              _filterBtn("PENDING", 'pending', Colors.orange),
-              const SizedBox(width: 10),
-              _filterBtn("IN PARK", 'parked', Colors.red),
-              const SizedBox(width: 10),
-              _filterBtn("ALL", 'all', Colors.blueGrey),
-            ]),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: Color(0xFF1E293B),
           ),
+        ),
+      ],
+    );
+  }
 
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('bookings')
-                  .where('parkingId', isEqualTo: widget.parkingId)
-                  .where('vehicleType', isEqualTo: widget.vehicleType)
-                  .where('status', whereIn: ['confirmed', 'parked']).snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-                var filteredDocs = snapshot.data!.docs.where((doc) {
-                  var data = doc.data() as Map<String, dynamic>;
-                  bool matchesFilter = (selectedFilter == 'all') ||
-                      (selectedFilter == 'parked' && data['status'] == 'parked') ||
-                      (selectedFilter == 'pending' && data['status'] == 'confirmed');
-                  bool matchesSearch = data['vehicleNumber'].toString().contains(searchQuery);
-                  return matchesFilter && matchesSearch;
-                }).toList();
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(15),
-                  itemCount: filteredDocs.length,
-                  itemBuilder: (context, index) {
-                    var doc = filteredDocs[index];
-                    bool isParked = doc['status'] == 'parked';
-                    return Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      child: ListTile(
-                        onTap: () => isParked ? _showCheckoutDialog(context, doc) : null,
-                        leading: Icon(Icons.directions_car, color: isParked ? Colors.red : Colors.orange),
-                        title: Text(doc['vehicleNumber'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(isParked ? "Parked (Tap to Release)" : "Pending Arrival"),
-                        trailing: Icon(isParked ? Icons.logout : Icons.hourglass_top, size: 18),
+  // Modern Header with Gradient Overlay
+  Widget _buildHeader(Map<String, dynamic> pData) {
+    return SliverAppBar(
+      expandedHeight: 240,
+      pinned: true,
+      backgroundColor: const Color(0xFF0F172A),
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background Image
+            Image.network(
+              'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=2070&auto=format&fit=crop',
+              fit: BoxFit.cover,
+            ),
+            // Modern Gradient Overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF0F172A).withOpacity(0.3),
+                    const Color(0xFF0F172A).withOpacity(0.9),
+                  ],
+                ),
+              ),
+            ),
+            // Parking Name with modern styling
+            Positioned(
+              bottom: 60,
+              left: 24,
+              right: 24,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: const Text(
+                      "ACTIVE PARKING",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
                       ),
-                    );
-                  },
-                );
-              },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    pData['parkingName'] ?? "Elite Parking",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          offset: Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Modern Occupancy Card with better design
+  Widget _buildOccupancyCard(String pId, Map<String, dynamic> pData) {
+    return Transform.translate(
+      offset: const Offset(0, -40),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+            BoxShadow(
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              blurRadius: 30,
+              offset: const Offset(0, 15),
+            ),
+          ],
+          border: Border.all(color: Colors.white.withOpacity(0.5)),
+        ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .where('parkingId', isEqualTo: pId)
+              .where('status', isEqualTo: 'parked')
+              .snapshots(),
+          builder: (context, snap) {
+            int count = snap.hasData ? snap.data!.docs.length : 0;
+            int total = int.tryParse(pData['totalSlots']?.toString() ?? '1') ?? 1;
+            double percent = (count / total).clamp(0.0, 1.0);
+
+            Color progressColor = percent > 0.8
+                ? const Color(0xFFDC2626)
+                : percent > 0.5
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFF10B981);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Occupancy Rate",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${(percent * 100).toInt()}%",
+                          style: const TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: -1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.directions_car_filled,
+                        color: Color(0xFF3B82F6),
+                        size: 32,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Modern Progress Bar
+                Stack(
+                  children: [
+                    Container(
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    Container(
+                      height: 16,
+                      width: MediaQuery.of(context).size.width * 0.7 * percent,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            progressColor,
+                            progressColor.withOpacity(0.7),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: progressColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatChip("Occupied", "$count Slots", const Color(0xFF3B82F6)),
+                    _buildStatChip("Total", "$total Slots", const Color(0xFF64748B)),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // Stat Chip for Occupancy Card
+  Widget _buildStatChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            "$label: ",
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
           ),
         ],
@@ -354,15 +584,167 @@ class _AdminVehicleListState extends State<AdminVehicleList> {
     );
   }
 
-  Widget _filterBtn(String label, String filter, Color color) {
-    bool isSel = selectedFilter == filter;
+  // Modern Action Card
+  Widget _buildActionCard(String title, IconData icon, Color color, Widget page) {
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => selectedFilter = filter),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
+        borderRadius: BorderRadius.circular(28),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(color: isSel ? color : color.withAlpha(30), borderRadius: BorderRadius.circular(10)),
-          child: Center(child: Text(label, style: TextStyle(color: isSel ? Colors.white : color, fontWeight: FontWeight.bold, fontSize: 11))),
+          height: 140,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color,
+                color.withOpacity(0.8),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Modern Operational Health Cards
+  Widget _buildOperationalHealth() {
+    return Row(
+      children: [
+        _buildHealthCard(
+          "Utilization",
+          "82%",
+          Icons.trending_up,
+          const Color(0xFF10B981),
+          const Color(0xFF059669),
+        ),
+        const SizedBox(width: 16),
+        _buildHealthCard(
+          "Revenue",
+          "LKR 12.4k",
+          Icons.attach_money,
+          const Color(0xFF3B82F6),
+          const Color(0xFF2563EB),
+        ),
+      ],
+    );
+  }
+
+  // Modern Health Card
+  Widget _buildHealthCard(
+      String label,
+      String value,
+      IconData icon,
+      Color startColor,
+      Color endColor,
+      ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+          border: Border.all(color: Colors.grey.shade100, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [startColor.withOpacity(0.1), endColor.withOpacity(0.1)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: startColor,
+                    size: 20,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: startColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "+12%",
+                    style: TextStyle(
+                      color: startColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: startColor,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
