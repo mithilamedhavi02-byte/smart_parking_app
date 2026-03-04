@@ -28,11 +28,11 @@ class ParkProApp extends StatelessWidget {
       title: 'Park-Pro',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3B82F6), // Modern Blue
+          seedColor: const Color(0xFF3B82F6),
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-        fontFamily: 'Inter', // වඩාත් නවීන Look එකක් සඳහා
+        fontFamily: 'Inter',
       ),
       initialRoute: '/',
       routes: {
@@ -62,11 +62,8 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-
-    // 1. Animation Setup (Logic එක එහෙම්මමයි, ඇනිමේෂන් එක විතරක් smooth කළා)
     _animController = AnimationController(vsync: this, duration: const Duration(seconds: 2));
     _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
-
     _initializeVideo();
   }
 
@@ -77,9 +74,7 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
         _controller.setVolume(0);
         _controller.play();
         if (mounted) {
-          setState(() {
-            _isVideoReady = true;
-          });
+          setState(() => _isVideoReady = true);
           _animController.forward();
         }
       });
@@ -94,15 +89,12 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    // වීඩියෝ එක ලෑස්ති නැතිනම් කළු screen එකක් පෙන්වන්න (අර රතු error එක එන්නේ නැහැ)
-    if (!_isVideoReady) {
-      return const Scaffold(backgroundColor: Color(0xFF020617));
-    }
+    if (!_isVideoReady) return const Scaffold(backgroundColor: Color(0xFF020617));
 
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Background Video
+          // Background Video
           SizedBox.expand(
             child: FittedBox(
               fit: BoxFit.cover,
@@ -114,7 +106,7 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
             ),
           ),
 
-          // 2. Dark Gradient Overlay (UI එක පැහැදිලිව පෙනීමට)
+          // Gradient Overlay
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -128,7 +120,8 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
             ),
           ),
 
-          // 3. Animated UI Content
+
+
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -136,62 +129,36 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
                   children: [
-                    const Spacer(flex: 3),
+                    // උඩ තියෙන හිස් ඉඩ අඩු කළා (3 සිට 1 දක්වා)
+                    const Spacer(flex: 1),
 
-                    // Logo with Glow Effect
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blueAccent.withOpacity(0.2),
-                            blurRadius: 40,
-                            spreadRadius: 10,
-                          )
-                        ],
-                      ),
-                      child: const MyAppIcon(iconData: Icons.local_parking_rounded, color: Colors.blueAccent, size: 90),
-                    ),
-
-                    const SizedBox(height: 20),
 
                     const Text(
                       "PARK-PRO",
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 8,
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 8
                       ),
                     ),
-
                     const Text(
                       "SMART PARKING REDEFINED",
                       style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                        letterSpacing: 3,
-                        fontWeight: FontWeight.bold,
+                          color: Colors.white54,
+                          fontSize: 12,
+                          letterSpacing: 3,
+                          fontWeight: FontWeight.bold
                       ),
                     ),
 
-                    const Spacer(flex: 2),
+                    // මැද තියෙන හිස් ඉඩ වැඩි කළා (2 සිට 4 දක්වා)
+                    // එවිට උඩ කොටස තවත් ඉහළට තල්ලු වෙනවා
+                    const Spacer(flex: 4),
 
-                    // Modern Glassmorphism Container for the Button
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(30),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(30),
-                            border: Border.all(color: Colors.white.withOpacity(0.1)),
-                          ),
-                          child: _buildEnhancedButton(context),
-                        ),
-                      ),
+                    // Premium Animated Button
+                    AnimatedPremiumButton(
+                      onTap: () => Navigator.pushReplacementNamed(context, '/auth'),
                     ),
 
                     const SizedBox(height: 30),
@@ -205,48 +172,95 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
               ),
             ),
           ),
+
+
+
         ],
       ),
     );
   }
+}
 
-  Widget _buildEnhancedButton(BuildContext context) {
-    return InkWell(
-      onTap: () => Navigator.pushReplacementNamed(context, '/auth'), // ✅ Logic එක කලින් වගේමයි
-      child: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blueAccent.withOpacity(0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            )
-          ],
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              "GET STARTED",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-                letterSpacing: 2,
+// --- 🔥 Animated Neon Button Widget ---
+class AnimatedPremiumButton extends StatefulWidget {
+  final VoidCallback onTap;
+  const AnimatedPremiumButton({super.key, required this.onTap});
+
+  @override
+  State<AnimatedPremiumButton> createState() => _AnimatedPremiumButtonState();
+}
+
+class _AnimatedPremiumButtonState extends State<AnimatedPremiumButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            height: 65,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              gradient: LinearGradient(
+                begin: Alignment(_controller.value * 2 - 1, -1),
+                end: Alignment(_controller.value * 2, 1),
+                colors: const [
+                  Color(0xFF000000),
+                  Color(0xFF0D47A1),
+                  Color(0xFF00E5FF), // Neon Glow
+                  Color(0xFF4A148C),
+                  Color(0xFF000000),
+                ],
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E5FF).withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: -5,
+                ),
+              ],
+              border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
             ),
-            SizedBox(width: 12),
-            Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-          ],
-        ),
-      ),
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+
+
+                ),
+                const Expanded(
+                  child: Center(
+                    child: Text("GET STARTED",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
+                  ),
+                ),
+                const SizedBox(width: 50),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

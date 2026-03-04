@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
-// අමතක නොකර MyAppIcon එක import කරන්න
 import 'my_app_icon.dart';
 
 class AdminAddParking extends StatefulWidget {
@@ -15,6 +14,10 @@ class _AdminAddParkingState extends State<AdminAddParking> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _address = TextEditingController();
+
+  // ✅ Phone Number එක සඳහා අලුත් Controller එක
+  final _phone = TextEditingController();
+
   final _rateFirst = TextEditingController();
   final _rateExtra = TextEditingController();
   final _rateFullDay = TextEditingController();
@@ -63,10 +66,12 @@ class _AdminAddParkingState extends State<AdminAddParking> {
       List<String> selectedFacilities = [];
       _facilities.forEach((key, value) { if (value) selectedFacilities.add(key); });
 
+      // ✅ Firestore එකට 'phone' field එක ඇතුළත් කිරීම
       await FirebaseFirestore.instance.collection('parkings').add({
         'adminId': uid,
         'parkingName': _name.text.trim(),
         'address': _address.text.trim(),
+        'phone': _phone.text.trim(), // අලුතින් එක් කළ කොටස
         'capacity': capacities,
         'currentFree': capacities,
         'totalSlots': totalSlots,
@@ -124,6 +129,11 @@ class _AdminAddParkingState extends State<AdminAddParking> {
                   _buildSection("Basic Details", Icons.business, [
                     _buildTextField(_name, "Parking Name", Icons.drive_file_rename_outline),
                     const SizedBox(height: 12),
+
+                    // ✅ Phone Number Field එක එකතු කළා
+                    _buildTextField(_phone, "Contact Number", Icons.phone_android, isNum: true),
+                    const SizedBox(height: 12),
+
                     _buildTextField(_address, "Address", Icons.map_outlined, maxLines: 2),
                   ]),
 

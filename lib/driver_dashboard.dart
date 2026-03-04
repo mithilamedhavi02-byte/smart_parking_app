@@ -36,16 +36,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
       ),
       body: Stack(
         children: [
+          // Background Image
           Container(decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/bg2.webp'), fit: BoxFit.cover))),
           Container(color: Colors.black.withOpacity(0.75)),
           SafeArea(
             child: Column(
               children: [
                 _buildSearchBar(),
-                _buildActiveBookingStatus(), // ✅ මේක තමයි පාලනය කරන්නේ
+                _buildActiveBookingStatus(),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 25, vertical: 15),
-                  child: Align(alignment: Alignment.centerLeft, child: Text("AVAILABLE PARKING HUBS", style: TextStyle(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.w900))),
+                  child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("AVAILABLE PARKING HUBS", style: TextStyle(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.w900))
+                  ),
                 ),
                 Expanded(child: _buildParkingList()),
               ],
@@ -56,6 +60,116 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
+  // ✅ City Search Filter Logic එක සහිත Search Bar එක
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.1))
+            ),
+            child: TextField(
+              style: const TextStyle(color: Colors.white),
+              onChanged: (v) => setState(() => _searchCity = v.toLowerCase()), // Search value එක update කරයි
+              decoration: const InputDecoration(
+                  hintText: "Search city...",
+                  hintStyle: TextStyle(color: Colors.white38),
+                  prefixIcon: Icon(Icons.search, color: Colors.blueAccent),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 15)
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+  // ✅ Parking List එක (Filter logic සහ Address styling සමඟ)
+  Widget _buildParkingList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('parkings').snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+
+        var docs = snap.data!.docs.where((doc) {
+          var d = doc.data() as Map<String, dynamic>;
+          String parkingName = d['parkingName']?.toString().toLowerCase() ?? "";
+          String address = d['address']?.toString().toLowerCase() ?? "";
+
+          return _searchCity.isEmpty ||
+              parkingName.contains(_searchCity) ||
+              address.contains(_searchCity);
+        }).toList();
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            var d = docs[i].data() as Map<String, dynamic>;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.local_parking, color: Colors.blueAccent),
+                ),
+                title: Text(
+                    d['parkingName'] ?? "",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 5),
+                    // ලිපිනය (Light Blue)
+                    Text(
+                        d['address'] ?? "",
+                        style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 13, fontWeight: FontWeight.w500)
+                    ),
+                    const SizedBox(height: 4),
+                    // ✅ අලුතින් එක් කළ Phone Number එක පෙන්වන කොටස
+                    Row(
+                      children: [
+                        const Icon(Icons.phone, color: Colors.white38, size: 14),
+                        const SizedBox(width: 5),
+                        Text(
+                            d['phone'] ?? "No Contact",
+                            style: const TextStyle(color: Colors.white38, fontSize: 12)
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => DriverBookingScreen(parkingData: d, parkingId: docs[i].id))
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Active Booking Status Logic
   Widget _buildActiveBookingStatus() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const SizedBox.shrink();
@@ -66,10 +180,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           .where('status', whereIn: ['pending', 'parked'])
           .snapshots(),
       builder: (context, snapshot) {
-        // ✅ දත්ත නැත්නම් හෝ ලොග් වුණ ගමන් මුකුත්ම පෙන්වන්නේ නැහැ
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SizedBox.shrink();
-        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
 
         var bookingDoc = snapshot.data!.docs.first;
         var data = bookingDoc.data() as Map<String, dynamic>;
@@ -78,20 +189,16 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
         if (status == 'pending') {
           DateTime expiry = (data['expiryTime'] as Timestamp).toDate();
-
-          // 🛑 දැනටමත් විනාඩි 15 ඉවර නම් Database එකෙන් මකලා දාන්න, පෙන්වන්න එපා
           if (DateTime.now().isAfter(expiry)) {
             FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete();
             return const SizedBox.shrink();
           }
-
           return _buildStatusCard(
             title: "RESERVATION EXPIRES IN",
             child: LiveCountdownTimer(expiryTime: expiry, bookingId: bookingId),
             icon: Icons.hourglass_top_rounded, color: Colors.orangeAccent, bookingId: bookingId,
           );
         } else if (status == 'parked') {
-          // ✅ වාහනය Park කරාම පෙන්වන Timer එක
           Timestamp? checkIn = data['checkInTime'] as Timestamp?;
           return _buildStatusCard(
             title: "PARKED AT: ${data['parkingName']}",
@@ -114,8 +221,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
           Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle), child: MyAppIcon(iconData: icon, color: color, size: 22)),
           const SizedBox(width: 15),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title.toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10)), const SizedBox(height: 4), child])),
-
-          // ✅ Cancel Button එක පේන්නේ Pending වෙලාවේ විතරයි
           if (!isParked)
             IconButton(
                 onPressed: () => FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete(),
@@ -125,60 +230,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
       ),
     );
   }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.1))),
-            child: TextField(
-              style: const TextStyle(color: Colors.white),
-              onChanged: (v) => setState(() => _searchCity = v.toLowerCase()),
-              decoration: const InputDecoration(hintText: "Search city...", hintStyle: TextStyle(color: Colors.white38), prefixIcon: Icon(Icons.search, color: Colors.blueAccent), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(vertical: 15)),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildParkingList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('parkings').snapshots(),
-      builder: (context, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        var docs = snap.data!.docs.where((doc) {
-          var d = doc.data() as Map<String, dynamic>;
-          return _searchCity.isEmpty || d['parkingName'].toString().toLowerCase().contains(_searchCity);
-        }).toList();
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: docs.length,
-          itemBuilder: (context, i) {
-            var d = docs[i].data() as Map<String, dynamic>;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
-              child: ListTile(
-                leading: const Icon(Icons.local_parking, color: Colors.blueAccent),
-                title: Text(d['parkingName'] ?? "", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: Text(d['address'] ?? "", style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => DriverBookingScreen(parkingData: d, parkingId: docs[i].id))),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 }
 
-// 🕒 Countdown Timer - කාලය ඉවර වුණ ගමන් Delete වෙනවා
+// 🕒 Timer Widgets (Logic කලින් වගේමයි)
 class LiveCountdownTimer extends StatefulWidget {
   final DateTime expiryTime;
   final String bookingId;
@@ -190,26 +244,19 @@ class LiveCountdownTimer extends StatefulWidget {
 class _LiveCountdownTimerState extends State<LiveCountdownTimer> {
   Timer? _timer;
   int _remaining = 0;
-
   @override
   void initState() { super.initState(); _startTimer(); }
-
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       int diff = widget.expiryTime.difference(DateTime.now()).inSeconds;
       if (diff <= 0) {
         t.cancel();
-        // 🗑️ විනාඩි 15 ඉවර වුණ ගමන් Database එකෙන් අයින් කරනවා
         FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId).delete();
-      } else {
-        if (mounted) setState(() => _remaining = diff);
-      }
+      } else { if (mounted) setState(() => _remaining = diff); }
     });
   }
-
   @override
   void dispose() { _timer?.cancel(); super.dispose(); }
-
   @override
   Widget build(BuildContext context) {
     String m = (_remaining ~/ 60).toString().padLeft(2, '0');
