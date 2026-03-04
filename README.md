@@ -1,68 +1,64 @@
 # 🚗 Park-Pro: Smart Parking Management System
 
-**Park-Pro** is a modern, high-performance mobile application designed to simplify urban parking challenges. Built with **Flutter** and **Firebase**, it provides real-time parking spot discovery, secure reservations, and automated management for both drivers and parking administrators.
+**Park-Pro** is a modern, high-performance mobile application designed to solve urban parking challenges. Built with **Flutter** and **Firebase**, it provides a seamless experience for drivers to find spots and a robust dashboard for administrators to manage their parking hubs in real-time.
 
 ---
-
-## ✨ Key Features
-
-### 👤 For Drivers
-* **Smart Discovery:** Real-time list of available parking hubs nearby.
-* **Live Reservation Timer:** 15-minute countdown for pending bookings with auto-cancellation logic.
-* **Active Status Card:** Visual indicators (Pending/Parked) with live elapsed time tracking.
-* **Modern UI:** Premium glassmorphism design with a cinematic video splash screen.
-
-### 🛠 For Administrators
-* **Parking Management:** Add, edit, or remove parking locations easily.
-* **Live Monitoring:** Track active vehicles and manage bookings via a secure dashboard.
-* **QR Integration:** Quick check-in/out system (Ready for expansion).
-* **Secure Cloud Sync:** Real-time data synchronization across all devices via Firebase.
 
 ## ✨ Screen Previews
 
+### 🚙 Driver Experience
 <p align="center">
-  <img src="මෙතනට_දිග_LINK_එක_පේස්ට්_කරන්න" width="30%" alt="Splash Screen">
-  <img src="මෙතනට_දිග_LINK_එක_පේස්ට්_කරන්න" width="30%" alt="Driver Dashboard">
-  <img src="මෙතනට_දිග_LINK_එක_පේස්ට්_කරන්න" width="30%" alt="Live Timer">
+  <img src="https://github.com/user-attachments/assets/06fb763f-fd07-4b11-8064-f950a87a8883" width="31%" alt="Splash Screen">
+  <img src="https://github.com/user-attachments/assets/383a23f1-ae0c-4c04-b1c9-ba300dfc1617" width="31%" alt="Find Parking">
+  <img src="https://github.com/user-attachments/assets/e3034122-38b1-4bb5-b133-c5ca6cd53843" width="31%" alt="Live Timer">
 </p>
 
+### 🛠️ Admin Management
 <p align="center">
-  <i>Splash Screen & Live Reservation Status</i>
+  <img src="https://github.com/user-attachments/assets/68b1699d-2998-4d63-8cdf-f9adc6b5baab" width="31%" alt="Admin Dashboard">
+  <img src="https://github.com/user-attachments/assets/84094435-debc-4b21-8c8c-860b59988c18" width="31%" alt="Arrival Requests">
+  <img src="https://github.com/user-attachments/assets/5db554b2-dc50-4450-a3f2-5bb47bacf4a6" width="31%" alt="Revenue Analytics">
 </p>
 
 ---
 
-### 📱 Feature Showcase
+## 🚀 Key Features
 
-| Splash Screen | Driver Dashboard | Live Status (Parked) |
-| :---: | :---: | :---: |
-| <img src="assets/readme/splash.png" height="350"> | <img src="assets/readme/dashboard.png" height="350"> | <img src="assets/readme/timer.png" height="350"> |
-| Premium Video Background | Real-time Hub Listing | Dynamic Elapsed Timer |
+### 👤 For Drivers
+* **Real-time Discovery:** Find nearby parking hubs with live availability of slots.
+* **Smart Filtering:** Search for hubs by city or specific address keywords.
+* **Secure Reservations:** 15-minute booking window with an automated countdown timer.
+* **Live Parking Tracker:** Real-time elapsed timer showing exactly how long your vehicle has been parked.
+* **Direct Contact:** Access hub phone numbers directly from the dashboard for easy communication.
+
+### 👨‍💼 For Admins
+* **Hub Registration:** Easily add parking hubs with details like address, contact number, and operating hours.
+* **Vehicle Segmentation:** Manage specific capacities for Motorcycles, Cars, Vans, and Heavy Vehicles separately.
+* **Automated Billing:** Real-time fee calculation based on entry time and hourly rates.
+* **Business Analytics:** Monitor daily revenue and occupancy rates through a visual dashboard.
+* **Facility Tags:** Highlight amenities like CCTV, EV Charging, and Security Guards.
 
 ---
 
-## 🚀 Tech Stack
+## 💻 Tech Stack
 
-* **Frontend:** Flutter (Dart)
-* **Backend:** Firebase Auth & Firestore
-* **State Management:** Streams & Listeners
-* **Media:** Video Player (Cinematic BG)
+* **Frontend:** Flutter (Dart) - Modern Glassmorphic UI with Backdrop Filters.
+* **Backend:** Firebase Authentication & Cloud Firestore (NoSQL Real-time Database).
+* **Media:** Video Player integration for high-fidelity cinematic backgrounds.
+* **Architecture:** Stream-based state management for real-time updates.
 
 ---
-
-
 
 ## 📈 Development Roadmap
 
-- [x] Premium Splash UI & Video BG
-- [x] Auto-cancel booking logic (15 mins)
-- [x] Live Elapsed Timer for Parked vehicles
-- [ ] In-app Payment Integration (Stripe/PayHere)
-- [ ] Google Maps Integration for Hub Navigation
+- [x] Premium Splash UI with Cinematic Video Background
+- [x] Multi-category Vehicle Capacity Management
+- [x] Real-time Booking & Expiry Logic (15-min auto-cancel)
+- [x] Digital Receipt & Revenue Tracking
+
 
 ---
 
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/mithilamedhavi02-byte/smart_parking_app/issues).
+
 
 **Developed with ❤️ by Mithila Medhavi**
