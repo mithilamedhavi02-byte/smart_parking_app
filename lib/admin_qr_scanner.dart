@@ -1,6 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:ui';
+import 'my_app_icon.dart';
+import 'vehicle_entry_page.dart'; // Import the entry page
 
 class AdminQRScanner extends StatefulWidget {
   const AdminQRScanner({super.key});
@@ -11,66 +15,211 @@ class AdminQRScanner extends StatefulWidget {
 
 class _AdminQRScannerState extends State<AdminQRScanner> {
   bool isPermissionGranted = false;
+  bool isScanning = true;
 
   @override
   void initState() {
     super.initState();
-    // පේජ් එක ලෝඩ් වෙද්දීම අවසර ඉල්ලමු
     _checkPermission();
   }
 
-  // අවසර ඉල්ලන ෆන්ෂන් එක
   Future<void> _checkPermission() async {
-    // කැමරාවට අවසර ඉල්ලීම
     final status = await Permission.camera.request();
-
     setState(() {
       isPermissionGranted = status.isGranted;
     });
-
-    // පර්මිෂන් එක ලැබුණේ නැත්නම් කෙලින්ම සෙටින්ග්ස් වලට යවන එක හොඳයි
     if (status.isPermanentlyDenied) {
       await openAppSettings();
     }
   }
 
+
+
+
+  // --- QR එක ස්කෑන් වුණාම සිදුවන ප්‍රධාන ලොජික් එක ---
+  void _handleScannedData(String scannedBookingId) async { // නම වෙනස් කළා පැහැදිලි වෙන්න
+    setState(() => isScanning = false);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
+    );
+
+    try {
+      var doc = await FirebaseFirestore.instance.collection('bookings').doc(scannedBookingId).get();
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      if (doc.exists) {
+        var data = doc.data()!;
+
+        if (data['status'] != 'pending') {
+          _showError("This booking is already ${data['status']}.");
+          return;
+        }
+
+        // ✅ මෙන්න මෙතන තමයි වැදගත්ම දේ:
+        // අපි VehicleEntryPage එකට අවශ්‍ය 'rates' ටික Firestore එකෙන් අරන් පාස් කරනවා.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VehicleEntryPage(
+              parkingId: data['parkingId'],
+              parkingName: data['parkingName'],
+              rates: data['rates'] ?? {}, // Firestore එකේ තියෙන rates ටික මෙතනට දානවා
+            ),
+          ),
+        );
+      } else {
+        _showError("Invalid QR Code. Booking not found.");
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      _showError("Connection Error. Please try again.");
+    }
+  }
+
+
+
+
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
+    );
+    // තත්පර 2කින් පස්සේ ආයේ ස්කෑන් කරන්න ඉඩ දෙනවා
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => isScanning = true);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("Scan QR"),
-        backgroundColor: Colors.blue.shade900,
+        title: const Text("SCAN BOOKING QR", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const MyAppIcon(iconData: Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      // පර්මිෂන් එක තියෙනවා නම් ස්කෑනරය පෙන්වනවා, නැත්නම් බටන් එක පෙන්වනවා
-      body: isPermissionGranted
-          ? MobileScanner(
-        onDetect: (capture) {
-          // මෙතන ස්කෑන් කිරීමෙන් පසු දත්ත Firestore එකට යැවීමේ ලොජික් එක දාන්න
-          final List<Barcode> barcodes = capture.barcodes;
-          for (final barcode in barcodes) {
-            debugPrint('Barcode found! ${barcode.rawValue}');
-          }
-        },
-      )
-          : Center(
+      body: Stack(
+        children: [
+          if (isPermissionGranted)
+            MobileScanner(
+              onDetect: (capture) {
+                if (!isScanning) return;
+                final List<Barcode> barcodes = capture.barcodes;
+                for (final barcode in barcodes) {
+                  if (barcode.rawValue != null) {
+                    _handleScannedData(barcode.rawValue!);
+                    break;
+                  }
+                }
+              },
+            )
+          else
+            _buildPermissionRequest(),
+
+          if (isPermissionGranted) _buildOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlay() {
+    return Stack(
+      children: [
+        // පේන ප්‍රදේශය විතරක් පැහැදිලි කරන Overlay එක
+        ColorFiltered(
+          colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.7), BlendMode.srcOut),
+          child: Stack(
+            children: [
+              Container(color: Colors.black),
+              Center(
+                child: Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Scanner Frame Design
+        Center(
+          child: Container(
+            width: 260,
+            height: 260,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.blueAccent, width: 2),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Stack(
+              children: [
+                _buildCorner(top: 0, left: 0, angle: 0),
+                _buildCorner(top: 0, right: 0, angle: 1.57),
+                _buildCorner(bottom: 0, left: 0, angle: 4.71),
+                _buildCorner(bottom: 0, right: 0, angle: 3.14),
+              ],
+            ),
+          ),
+        ),
+        const Positioned(
+          bottom: 120,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Text("Place the QR code inside the frame", style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: 0.5)),
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildCorner({double? top, double? bottom, double? left, double? right, required double angle}) {
+    return Positioned(
+      top: top, bottom: bottom, left: left, right: right,
+      child: Transform.rotate(
+        angle: angle,
+        child: Container(
+          width: 40, height: 40,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Colors.blueAccent, width: 6),
+              left: BorderSide(color: Colors.blueAccent, width: 6),
+            ),
+            borderRadius: BorderRadius.only(topLeft: Radius.circular(15)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPermissionRequest() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.camera_alt_outlined, size: 80, color: Colors.grey),
-            const SizedBox(height: 20),
-            const Text(
-              "Camera permission is required!",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 20),
+            const MyAppIcon(iconData: Icons.camera_enhance_rounded, size: 80, color: Colors.blueAccent),
+            const SizedBox(height: 25),
+            const Text("Camera Access Needed", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            const Text("To scan parking tickets, we need your camera permission.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
+            const SizedBox(height: 40),
             ElevatedButton(
-              // මෙන්න මෙතන බටන් එක ක්ලික් කළාම ආයේ පර්මිෂන් චෙක් කරනවා
-              onPressed: () => _checkPermission(),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              child: const Text("Grant Permission"),
+              onPressed: _checkPermission,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              child: const Text("ALLOW CAMERA", style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),

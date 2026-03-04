@@ -3,8 +3,10 @@ import 'package:parking1/main.dart';
 
 void main() {
   testWidgets('App load test', (WidgetTester tester) async {
-    // lib/main.dart එකේ තියෙන්නේ MyApp නිසා මෙතනත් ඒ නමම විය යුතුයි
-    await tester.pumpWidget(const MyApp());
-    expect(find.byType(MyApp), findsOneWidget);
+    // 1. pumpWidget එකට ParkProApp() ලබා දෙන්න
+    await tester.pumpWidget(const ParkProApp());
+
+    // 2. find.byType එකේදීත් ParkProApp පරීක්ෂා කරන්න
+    expect(find.byType(ParkProApp), findsOneWidget);
   });
 }

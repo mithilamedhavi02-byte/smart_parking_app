@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui'; // Glass effect එක සඳහා
 import 'login_screen.dart';
+// අමතක නොකර MyAppIcon එක import කරන්න
+import 'my_app_icon.dart';
 
 class DriverProfilePage extends StatelessWidget {
   const DriverProfilePage({super.key});
@@ -23,128 +26,174 @@ class DriverProfilePage extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FE), // පිරිසිදු පසුබිම් වර්ණයක්
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("MY PROFILE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        backgroundColor: Colors.blue.shade900,
-        foregroundColor: Colors.white,
+        title: const Text("MY PROFILE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 18)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        // වැදගත්: මෙතන 'users' වෙනුවට 'drivers' ලෙස තිබිය යුතුයි
-        stream: FirebaseFirestore.instance.collection('drivers').doc(user?.uid).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Stack(
+        children: [
+          // 1. Background Image
+          Container(
+            height: double.infinity,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/bg2.webp'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          // 2. Dark Overlay
+          Container(color: Colors.black.withValues(alpha:0.75)),
 
-          if (snapshot.hasError) {
-            return const Center(child: Text("Error loading profile"));
-          }
+          // 3. Main Content
+          SafeArea(
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
+                }
 
-          // දත්ත තිබේදැයි පරීක්ෂා කිරීම (Null safety)
-          var data = snapshot.data?.data() as Map<String, dynamic>?;
+                var data = snapshot.data?.data() as Map<String, dynamic>?;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(25),
-            child: Column(
-              children: [
-                // Profile Header Section
-                Center(
-                  child: Stack(
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+                  child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 55,
-                        backgroundColor: Colors.blue.shade900,
-                        child: const Icon(Icons.person, size: 60, color: Colors.white),
+                      // Profile Header with Glass Effect
+                      _buildProfileHeader(data?['name'] ?? "Driver Name"),
+
+                      const SizedBox(height: 30),
+
+                      // Info Section (Glass Card)
+                      _buildGlassCard(
+                        children: [
+                          _buildInfoRow("Full Name", data?['name'] ?? "Not Set", Icons.person_rounded),
+                          _buildInfoRow("Email", data?['email'] ?? user?.email ?? "Not Set", Icons.email_rounded),
+                          _buildInfoRow("Phone", data?['phone'] ?? "Not Set", Icons.phone_android_rounded),
+                          _buildInfoRow("Account Role", data?['role']?.toString().toUpperCase() ?? "DRIVER", Icons.verified_user_rounded),
+                        ],
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                          child: const Icon(Icons.check, color: Colors.white, size: 18),
-                        ),
-                      ),
+
+                      const SizedBox(height: 40),
+
+                      // Logout Button
+                      _buildLogoutButton(context),
+
+                      const SizedBox(height: 30),
+                      const Text("v1.0.2 - ParkPro App", style: TextStyle(color: Colors.white38, fontSize: 11)),
                     ],
                   ),
-                ),
-                const SizedBox(height: 15),
-                Text(
-                  data?['name'] ?? "Driver Name",
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const Text("Verified Driver Account", style: TextStyle(color: Colors.grey, fontSize: 13)),
-
-                const SizedBox(height: 35),
-
-                // Info Cards
-                _buildInfoTile("Full Name", data?['name'] ?? "Not Set", Icons.person_outline),
-                _buildInfoTile("Email Address", data?['email'] ?? user?.email ?? "Not Set", Icons.email_outlined),
-                _buildInfoTile("Phone Number", data?['phone'] ?? "Not Set", Icons.phone_android_outlined),
-                _buildInfoTile("Account Role", data?['role']?.toString().toUpperCase() ?? "DRIVER", Icons.verified_user_outlined),
-
-                const SizedBox(height: 40),
-
-                // LOGOUT BUTTON
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showLogoutDialog(context),
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text("LOGOUT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text("v1.0.2 - ParkPro App", style: TextStyle(color: Colors.grey, fontSize: 11)),
-              ],
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInfoTile(String label, String value, IconData icon) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
+  // --- UI Components ---
+
+  Widget _buildProfileHeader(String name) {
+    return Column(
+      children: [
+        Center(
+          child: Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.blueAccent.withValues(alpha:0.5), width: 2),
+                ),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.white.withValues(alpha:0.1),
+                  // MyAppIcon පාවිච්චි කළා Icons error එක එන්නේ නැති වෙන්න
+                  child: const MyAppIcon(iconData: Icons.person, size: 55, color: Colors.white),
+                ),
+              ),
+              Positioned(
+                bottom: 5,
+                right: 5,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                  child: const MyAppIcon(iconData: Icons.check, color: Colors.white, size: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 15),
+        Text(
+          name,
+          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const Text("Verified Driver Account", style: TextStyle(color: Colors.white54, fontSize: 13)),
+      ],
+    );
+  }
+
+  Widget _buildGlassCard({required List<Widget> children}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(25),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha:0.08),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.white.withValues(alpha:0.15)),
+          ),
+          child: Column(children: children),
+        ),
       ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, IconData iconData) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          Icon(icon, color: Colors.blue.shade900, size: 24),
+          MyAppIcon(iconData: iconData, color: Colors.blueAccent, size: 22),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
+                Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 55,
+      child: ElevatedButton.icon(
+        onPressed: () => _showLogoutDialog(context),
+        icon: const MyAppIcon(iconData: Icons.logout_rounded, size: 20, color: Colors.white),
+        label: const Text("SIGN OUT", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.redAccent.withValues(alpha:0.8),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 0,
+        ),
       ),
     );
   }
@@ -152,20 +201,24 @@ class DriverProfilePage extends StatelessWidget {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to sign out from your account?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () => _logout(context),
-            child: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          ),
-        ],
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Logout", style: TextStyle(color: Colors.white)),
+          content: const Text("Are you sure you want to sign out?", style: TextStyle(color: Colors.white70)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+            ),
+            TextButton(
+              onPressed: () => _logout(context),
+              child: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }

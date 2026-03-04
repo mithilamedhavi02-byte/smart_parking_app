@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.7 <4.0.0'
+  sdk: '>=3.10.3 <4.0.0'
 
 dependencies:
   flutter:
@@ -54,3 +54,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/videos/parking_bg.mp4
+    - assets/bg.jpg
+    - assets/parking_header.jpg
+    - assets/bg1.webp
+    - assets/bg2.webp
+    - assets/b4.jpg

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'my_app_icon.dart'; // 👈 අපේ custom icon class එක import කරගන්න
 
 class ActiveVehiclesPage extends StatelessWidget {
   final String parkingId;
@@ -11,197 +13,285 @@ class ActiveVehiclesPage extends StatelessWidget {
     required this.fullData,
   });
 
+  final Color primaryBlue = const Color(0xFF0D47A1);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: const Text("Currently Parked"),
-        backgroundColor: const Color(0xFF0D47A1),
-        foregroundColor: Colors.white,
+        title: const Text("LIVE PARKED VEHICLES",
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
+        foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('bookings')
-            .where('parkingId', isEqualTo: parkingId)
-            .where('status', isEqualTo: 'parked')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.directions_car_filled_outlined, size: 80, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text("No vehicles parked right now.", style: TextStyle(color: Colors.grey, fontSize: 16)),
-                ],
+      body: Stack(
+        children: [
+          // 1. Background Image UI
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                  image: AssetImage('assets/bg1.webp'),
+                  fit: BoxFit.cover
               ),
-            );
-          }
+            ),
+          ),
+          Container(color: Colors.black.withValues(alpha: 0.85)),
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              var doc = snapshot.data!.docs[index];
-              var data = doc.data() as Map<String, dynamic>;
-              DateTime checkIn = (data['checkInTime'] as Timestamp).toDate();
-              String vType = data['vehicleType'] ?? "Vehicle";
+          // 2. Data Stream
+          SafeArea(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('bookings')
+                  .where('parkingId', isEqualTo: parkingId)
+                  .where('status', isEqualTo: 'parked')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState();
+                }
 
-              return Card(
-                elevation: 3,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(15),
-                  leading: CircleAvatar(
-                    radius: 25,
-                    backgroundColor: Colors.blue.shade50,
-                    child: Icon(_getIcon(vType), color: const Color(0xFF0D47A1)),
-                  ),
-                  title: Text(data['vehicleNumber'] ?? "N/A",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  subtitle: Text("Type: $vType\nIn: ${checkIn.hour}:${checkIn.minute.toString().padLeft(2, '0')}"),
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => _showCheckoutConfirm(context, doc.id, data, checkIn),
-                    child: const Text("CHECKOUT", style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    var doc = snapshot.data!.docs[index];
+                    var data = doc.data() as Map<String, dynamic>;
 
-  IconData _getIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'car': return Icons.directions_car;
-      case 'bus': return Icons.directions_bus;
-      case 'bike': return Icons.directions_bike;
-      case 'van': return Icons.airport_shuttle;
-      case 'tuk-tuk': return Icons.electric_rickshaw;
-      default: return Icons.local_parking;
-    }
-  }
+                    DateTime checkIn = (data['checkInTime'] as Timestamp?)?.toDate() ??
+                        (data['entryTime'] as Timestamp?)?.toDate() ??
+                        DateTime.now();
 
-  // --- පියවර 1: Checkout එක තහවුරු කිරීමේ Dialog එක ---
-  void _showCheckoutConfirm(BuildContext context, String bId, Map<String, dynamic> data, DateTime checkIn) {
-    DateTime now = DateTime.now();
-    Duration diff = now.difference(checkIn);
-    int hours = (diff.inMinutes / 60).ceil();
-    if (hours == 0) hours = 1;
-
-    // Rates ගණනය කිරීම
-    int firstHour = int.tryParse(fullData['rates']?['firstHour']?.toString() ?? '100') ?? 100;
-    int extraHour = int.tryParse(fullData['rates']?['extraHour']?.toString() ?? '80') ?? 80;
-    int totalBill = firstHour + ((hours - 1) * extraHour);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Checkout"),
-        content: Text("Vehicle: ${data['vehicleNumber']}\nDuration: $hours Hr(s)\nTotal Bill: LKR $totalBill.00"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              String vType = data['vehicleType'] ?? 'Car';
-
-              // 1. Update Booking Status
-              await FirebaseFirestore.instance.collection('bookings').doc(bId).update({
-                'status': 'completed',
-                'checkOutTime': FieldValue.serverTimestamp(),
-                'totalBill': totalBill,
-                'stayDuration': "$hours Hr(s)",
-              });
-
-              // 2. Increment Free Slots
-              await FirebaseFirestore.instance.collection('parkings').doc(parkingId).update({
-                'currentFree.$vType': FieldValue.increment(1),
-              });
-
-              if (context.mounted) {
-                Navigator.pop(context); // Confirm dialog එක වහනවා
-                _showReceiptDialog(context, data, totalBill, hours); // බිල් එක පෙන්වනවා
-              }
-            },
-            child: const Text("Confirm & Pay"),
+                    String vType = data['vehicleType'] ?? "Car";
+                    return _buildVehicleCard(context, doc.id, data, checkIn, vType);
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  // --- පියවර 2: අවසාන බිල් පත (Receipt Dialog) ---
-  void _showReceiptDialog(BuildContext context, Map<String, dynamic> data, int bill, int hours) {
+  // --- Vehicle List Card ---
+  Widget _buildVehicleCard(BuildContext context, String bId, Map<String, dynamic> data, DateTime checkIn, String vType) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: MyAppIcon(iconData: _getIcon(vType), color: Colors.blueAccent, size: 28),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(data['vehicleNumber'] ?? "UNKNOWN",
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.5)),
+                      const SizedBox(height: 3),
+                      Text("$vType • Since ${checkIn.hour}:${checkIn.minute.toString().padLeft(2, '0')}",
+                          style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent, width: 0.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                  ),
+                  onPressed: () => _showCheckoutConfirm(context, bId, data, checkIn),
+                  child: const Text("OUT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Checkout Calculation Logic ---
+  void _showCheckoutConfirm(BuildContext context, String bId, Map<String, dynamic> data, DateTime checkIn) {
+    DateTime now = DateTime.now();
+    Duration diff = now.difference(checkIn);
+
+    int hours = diff.inHours;
+    if (diff.inMinutes % 60 > 0) hours++;
+    if (hours == 0) hours = 1;
+
+    int firstHour = int.tryParse(fullData['rates']?['firstHour']?.toString() ?? '100') ?? 100;
+    int extraHour = int.tryParse(fullData['rates']?['extraHour']?.toString() ?? '80') ?? 80;
+    int totalBill = firstHour + ((hours - 1) * extraHour);
+
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 70),
-            const SizedBox(height: 10),
-            const Text("PAYMENT SUCCESS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.green)),
-            const SizedBox(height: 5),
-            Text(fullData['parkingName'] ?? "Parking Receipt", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            const Divider(height: 30, thickness: 1),
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25), side: const BorderSide(color: Colors.white10)),
+          title: const Text("Confirm Checkout", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _infoRow("Vehicle No", data['vehicleNumber']),
+              _infoRow("Check-in", "${checkIn.hour}:${checkIn.minute.toString().padLeft(2, '0')}"),
+              _infoRow("Duration", "$hours Hour(s)"),
+              const Divider(color: Colors.white10, height: 30),
+              _infoRow("TOTAL PAYABLE", "LKR $totalBill.00", isGold: true),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel", style: TextStyle(color: Colors.white38))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              onPressed: () async {
+                String vType = data['vehicleType'] ?? 'Car';
+                await FirebaseFirestore.instance.collection('bookings').doc(bId).update({
+                  'status': 'completed',
+                  'checkOutTime': FieldValue.serverTimestamp(),
+                  'totalBill': totalBill,
+                  'stayDuration': "$hours Hr(s)",
+                });
 
-            _receiptRow("Vehicle No", data['vehicleNumber'] ?? "N/A"),
-            _receiptRow("Vehicle Type", data['vehicleType'] ?? "N/A"),
-            _receiptRow("Duration", "$hours Hr(s)"),
-            _receiptRow("Date", DateTime.now().toString().split(' ')[0]),
+                await FirebaseFirestore.instance.collection('parkings').doc(parkingId).update({
+                  'currentFree.$vType': FieldValue.increment(1),
+                });
 
-            const Divider(height: 30, thickness: 1),
-            _receiptRow("TOTAL BILL", "LKR $bill.00", isBold: true),
-            const SizedBox(height: 25),
-
-            // Print බොත්තම (දැනට UI එක පමණයි)
-            SizedBox(
-              width: double.infinity,
-              height: 45,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // මෙතනට Thermal Printer කෝඩ් එක දාන්න පුළුවන්
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Printing Receipt...")));
-                },
-                icon: const Icon(Icons.print, color: Colors.white),
-                label: const Text("PRINT BILL", style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-              ),
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _showReceiptDialog(context, data, totalBill, hours);
+                }
+              },
+              child: const Text("Confirm Payment", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("DONE", style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-            )
           ],
         ),
       ),
     );
   }
 
-  Widget _receiptRow(String label, String value, {bool isBold = false}) {
+  // --- Official Receipt UI ---
+  void _showReceiptDialog(BuildContext context, Map<String, dynamic> data, int bill, int hours) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Error Fixed: standard Icon වෙනුවට MyAppIcon පාවිච්චි කළා
+              const MyAppIcon(iconData: Icons.check_circle_rounded, color: Colors.green, size: 70),
+              const SizedBox(height: 10),
+              const Text("PAYMENT SUCCESS", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black)),
+              const Text("ParkPro Official Receipt", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1)),
+              const SizedBox(height: 25),
+              _receiptRow("Vehicle Number", data['vehicleNumber'] ?? "N/A"),
+              _receiptRow("Stay Duration", "$hours Hour(s)"),
+              _receiptRow("Payment Method", "Cash"),
+              const Divider(height: 35, thickness: 1, color: Colors.black12),
+              _receiptRow("TOTAL AMOUNT", "LKR $bill.00", isBold: true),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Receipt print logic can go here
+                  },
+                  // Error Fixed: icon parameter එකට MyAppIcon පාවිච්චි කළා
+                  icon: const MyAppIcon(iconData: Icons.print_rounded, size: 18, color: Colors.white),
+                  label: const Text("PRINT RECEIPT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          MyAppIcon(iconData: Icons.local_parking_rounded, size: 80, color: Colors.white.withValues(alpha: 0.1)),
+          const SizedBox(height: 15),
+          const Text("No Active Vehicles", style: TextStyle(color: Colors.white24, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'car': return Icons.directions_car_filled_rounded;
+      case 'bike': return Icons.motorcycle_rounded;
+      case 'van': return Icons.airport_shuttle_rounded;
+      case 'bus': return Icons.directions_bus_rounded;
+      case 'tuk-tuk': return Icons.electric_rickshaw_rounded;
+      default: return Icons.local_parking_rounded;
+    }
+  }
+
+  Widget _infoRow(String label, String? val, {bool isGold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 14)),
-          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w500, fontSize: isBold ? 18 : 14, color: isBold ? Colors.blue.shade900 : Colors.black87)),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+          Text(val ?? "N/A", style: TextStyle(color: isGold ? Colors.orangeAccent : Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _receiptRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.black45, fontSize: 13)),
+          Text(value, style: TextStyle(color: Colors.black87, fontWeight: isBold ? FontWeight.w900 : FontWeight.bold, fontSize: isBold ? 18 : 13)),
         ],
       ),
     );

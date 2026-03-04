@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
 import 'admin_dashboard.dart';
 import 'driver_dashboard.dart';
@@ -17,22 +17,23 @@ class AuthWrapper extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        if (!snapshot.hasData) return const LoginScreen();
+        // 1. If not logged in
+        if (!snapshot.hasData) {
+          return const LoginScreen();
+        }
 
+        // 2. If logged in, check role from Firestore (admins or drivers collection)
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance.collection('admins').doc(snapshot.data!.uid).get(),
           builder: (context, adminSnap) {
-            if (adminSnap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            }
+            if (adminSnap.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-            // User admins collection එකේ ඉන්නවා නම් AdminDashboard පෙන්වයි
             if (adminSnap.hasData && adminSnap.data!.exists) {
               return const AdminDashboard();
-            } else {
-              // නැතිනම් DriverDashboard පෙන්වයි
-              return const DriverDashboard();
             }
+
+            // If not in admins, check drivers
+            return const DriverDashboard();
           },
         );
       },

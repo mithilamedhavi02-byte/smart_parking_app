@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'my_app_icon.dart'; // අමතක නොකර import කරගන්න
 
 class EditParkingPage extends StatefulWidget {
   final String parkingId;
@@ -15,7 +17,6 @@ class _EditParkingPageState extends State<EditParkingPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // Controllers කලින්ම initialize කරනවා LateInitializationError මඟහරින්න
   final TextEditingController _name = TextEditingController();
   final TextEditingController _address = TextEditingController();
   final TextEditingController _rateFirst = TextEditingController();
@@ -38,17 +39,14 @@ class _EditParkingPageState extends State<EditParkingPage> {
   }
 
   void _fillExistingData() {
-    // Basic Info
     _name.text = widget.currentData['parkingName']?.toString() ?? "";
     _address.text = widget.currentData['address']?.toString() ?? "";
 
-    // Pricing (Null check එකක් දාලා ආරක්ෂිතව අගයන් ගන්නවා)
     final prices = widget.currentData['prices'] as Map<String, dynamic>? ?? {};
     _rateFirst.text = (prices['firstHour'] ?? '0').toString();
     _rateExtra.text = (prices['extraHour'] ?? '0').toString();
     _rateFullDay.text = (prices['fullDay'] ?? '0').toString();
 
-    // Capacity (Vehicle Grid)
     final capacities = widget.currentData['capacity'] as Map<String, dynamic>? ?? {};
     _vehicleControllers.forEach((key, controller) {
       if (capacities.containsKey(key)) {
@@ -82,11 +80,11 @@ class _EditParkingPageState extends State<EditParkingPage> {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Parking Details Updated! ✨"), backgroundColor: Colors.blue),
+        const SnackBar(content: Text("Parking Details Updated Successfully! ✨"), backgroundColor: Colors.blueAccent),
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.redAccent));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -96,104 +94,139 @@ class _EditParkingPageState extends State<EditParkingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFF0F172A),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("Edit Parking Info", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.blue.shade900,
-        foregroundColor: Colors.white,
+        title: const Text("EDIT PARKING", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const MyAppIcon(iconData: Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _buildSectionHeader("Basic Information"),
-            _buildCard([
-              _buildTextField(_name, "Parking Space Name", Icons.business),
-              const SizedBox(height: 15),
-              _buildTextField(_address, "Full Address", Icons.location_on, maxLines: 2),
-            ]),
-            _buildSectionHeader("Total Capacity (Slots)"),
-            _buildCard([_buildVehicleGrid()]),
-            _buildSectionHeader("Pricing Structure (LKR)"),
-            _buildCard([
-              Row(
+      body: Stack(
+        children: [
+          // Background Image with Blur
+          Container(
+            decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/bg1.webp'), fit: BoxFit.cover)),
+          ),
+          Container(color: Colors.black.withValues(alpha: 0.8)),
+
+          SafeArea(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
+                : Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(20),
                 children: [
-                  Expanded(child: _buildTextField(_rateFirst, "1st Hour", Icons.timer, isNum: true)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _buildTextField(_rateExtra, "Add. Hour", Icons.more_time, isNum: true)),
+                  _buildSectionHeader("BASIC INFORMATION"),
+                  _buildGlassCard([
+                    _buildTextField(_name, "Parking Space Name", Icons.business_rounded),
+                    const SizedBox(height: 15),
+                    _buildTextField(_address, "Full Address", Icons.location_on_rounded, maxLines: 2),
+                  ]),
+
+                  _buildSectionHeader("TOTAL CAPACITY (SLOTS)"),
+                  _buildGlassCard([_buildVehicleGrid()]),
+
+                  _buildSectionHeader("PRICING STRUCTURE (LKR)"),
+                  _buildGlassCard([
+                    Row(
+                      children: [
+                        Expanded(child: _buildTextField(_rateFirst, "1st Hour", Icons.timer_rounded, isNum: true)),
+                        const SizedBox(width: 10),
+                        Expanded(child: _buildTextField(_rateExtra, "Add. Hour", Icons.more_time_rounded, isNum: true)),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    _buildTextField(_rateFullDay, "Full Day Rate", Icons.calendar_today_rounded, isNum: true),
+                  ]),
+
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: updateParking,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        elevation: 10,
+                      ),
+                      child: const Text("SAVE CHANGES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
-              const SizedBox(height: 15),
-              _buildTextField(_rateFullDay, "Full Day Rate", Icons.calendar_today, isNum: true),
-            ]),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: updateParking,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade900,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              child: const Text("UPDATE PARKING", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // --- Helper Methods (ඔයාගේ Add Page එකේ UI එකමයි) ---
+  // --- UI Helpers ---
 
   Widget _buildSectionHeader(String title) => Padding(
-    padding: const EdgeInsets.only(bottom: 8, top: 15),
-    child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
+    padding: const EdgeInsets.only(bottom: 10, top: 15, left: 5),
+    child: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.blueAccent, letterSpacing: 1)),
   );
 
-  Widget _buildCard(List<Widget> children) => Container(
-    padding: const EdgeInsets.all(16),
-    margin: const EdgeInsets.only(bottom: 10),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(15),
-      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+  Widget _buildGlassCard(List<Widget> children) => ClipRRect(
+    borderRadius: BorderRadius.circular(25),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Column(children: children),
+      ),
     ),
-    child: Column(children: children),
   );
 
   Widget _buildTextField(TextEditingController ctrl, String lbl, IconData icon, {bool isNum = false, int maxLines = 1}) => TextFormField(
     controller: ctrl,
     maxLines: maxLines,
+    style: const TextStyle(color: Colors.white),
     keyboardType: isNum ? TextInputType.number : TextInputType.text,
-    validator: (v) => v!.isEmpty ? "Field Required" : null,
+    validator: (v) => v!.isEmpty ? "Required" : null,
     decoration: InputDecoration(
       labelText: lbl,
-      prefixIcon: Icon(icon, size: 20),
+      labelStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+      prefixIcon: MyAppIcon(iconData: icon, color: Colors.blueAccent, size: 20),
       filled: true,
-      fillColor: Colors.grey.shade50,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      fillColor: Colors.white.withValues(alpha: 0.05),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.blueAccent, width: 1)),
     ),
   );
 
   Widget _buildVehicleGrid() => GridView.builder(
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 2.0, crossAxisSpacing: 8, mainAxisSpacing: 8),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.6, crossAxisSpacing: 10, mainAxisSpacing: 10),
     itemCount: _vehicleControllers.length,
     itemBuilder: (context, index) {
       String type = _vehicleControllers.keys.elementAt(index);
       return TextFormField(
         controller: _vehicleControllers[type],
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         decoration: InputDecoration(
           labelText: type,
-          labelStyle: const TextStyle(fontSize: 12),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding: EdgeInsets.zero,
+          labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
         ),
       );
     },
