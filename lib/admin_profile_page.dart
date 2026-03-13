@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'login_screen.dart';
-// අමතක නොකර MyAppIcon එක import කරන්න
 import 'my_app_icon.dart';
 
 class AdminProfilePage extends StatelessWidget {
@@ -39,7 +38,7 @@ class AdminProfilePage extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // 1. Background Image
+          // 1. Background UI
           Container(
             height: double.infinity,
             width: double.infinity,
@@ -50,55 +49,68 @@ class AdminProfilePage extends StatelessWidget {
               ),
             ),
           ),
-          // Dark Gradient Overlay
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withValues(alpha:0.6),
-                  Colors.black.withValues(alpha:0.9),
+                  Colors.black.withOpacity(0.6),
+                  Colors.black.withOpacity(0.9),
                 ],
               ),
             ),
           ),
 
-          // 2. Profile Content
+          // 2. Profile Content using StreamBuilder for Auto-Updates
           SafeArea(
             child: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+              // 'admins' collection එකෙන් current user ගේ දත්ත ලබා ගැනීම
+              stream: FirebaseFirestore.instance
+                  .collection('admins')
+                  .doc(user?.uid)
+                  .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text("Error loading profile", style: TextStyle(color: Colors.white)));
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Colors.white));
+                if (snapshot.hasError) {
+                  return const Center(child: Text("Error loading profile", style: TextStyle(color: Colors.white)));
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Colors.white));
+                }
 
                 Map<String, dynamic>? data = snapshot.data?.data() as Map<String, dynamic>?;
+
+                // දත්ත auto-update වන පරිදි variables වලට ලබා ගැනීම
+                String adminName = data?['name'] ?? "Admin";
+                String adminEmail = data?['email'] ?? user?.email ?? "Not Set";
+                String adminRole = (data?['role'] ?? "Admin").toString().toUpperCase();
 
                 return SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
                   child: Column(
                     children: [
-                      _buildProfileHeader(data?['name'] ?? "Admin"),
-
+                      _buildProfileHeader(adminName),
                       const SizedBox(height: 40),
 
-                      // Glassy Information Cards
-                      _buildGlassInfoCard("Full Name", data?['name'] ?? "Not Set", Icons.person_outline_rounded),
-                      _buildGlassInfoCard("Email Address", data?['email'] ?? user?.email ?? "Not Set", Icons.email_outlined),
-                      _buildGlassInfoCard("User Role", data?['role'] ?? "Administrator", Icons.admin_panel_settings_outlined),
+                      // තොරතුරු පෙන්වන Glassy Cards
+                      _buildGlassInfoCard("Full Name", adminName, Icons.person_outline_rounded),
+                      _buildGlassInfoCard("Email Address", adminEmail, Icons.email_outlined),
+                      _buildGlassInfoCard("User Role", adminRole, Icons.admin_panel_settings_outlined),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 20),
 
-                      // Additional Options
+                      // අමතර විකල්ප (Action Rows)
                       _buildSimpleActionRow(Icons.security, "Security Settings"),
                       _buildSimpleActionRow(Icons.help_outline, "Help & Support"),
 
-                      const SizedBox(height: 50),
+                      const SizedBox(height: 40),
 
-                      // Logout Button
+                      // Logout Button (දැන් මෙය නිවැරදිව පෙනෙනු ඇත)
                       _buildLogoutButton(context),
+
                       const SizedBox(height: 20),
-                      const Text("App Version 1.0.0", style: TextStyle(color: Colors.white24, fontSize: 12)),
+                      const Text("App Version 1.0.0",
+                          style: TextStyle(color: Colors.white24, fontSize: 12)),
                     ],
                   ),
                 );
@@ -109,6 +121,8 @@ class AdminProfilePage extends StatelessWidget {
       ),
     );
   }
+
+  // --- UI Helper Widgets ---
 
   Widget _buildProfileHeader(String name) {
     return Column(
@@ -131,7 +145,6 @@ class AdminProfilePage extends StatelessWidget {
             CircleAvatar(
               radius: 18,
               backgroundColor: primaryBlue,
-              // MyAppIcon පාවිච්චි කළා
               child: const MyAppIcon(iconData: Icons.camera_alt_rounded, size: 18, color: Colors.white),
             ),
           ],
@@ -139,19 +152,19 @@ class AdminProfilePage extends StatelessWidget {
         const SizedBox(height: 20),
         Text(
           name.toUpperCase(),
-          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.2),
         ),
         const SizedBox(height: 5),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.greenAccent.withValues(alpha:0.1),
+            color: Colors.greenAccent.withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.greenAccent.withValues(alpha:0.3)),
+            border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
           ),
           child: const Text(
             "VERIFIED ADMIN",
-            style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+            style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -168,19 +181,18 @@ class AdminProfilePage extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha:0.06),
+              color: Colors.white.withOpacity(0.06),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha:0.1)),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha:0.1),
+                    color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  // MyAppIcon පාවිච්චි කළා
                   child: MyAppIcon(iconData: iconData, color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 20),
@@ -188,7 +200,7 @@ class AdminProfilePage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
                       Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
                     ],
@@ -207,7 +219,6 @@ class AdminProfilePage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       child: Row(
         children: [
-          // MyAppIcon පාවිච්චි කළා
           MyAppIcon(iconData: iconData, color: Colors.white38, size: 20),
           const SizedBox(width: 15),
           Text(title, style: const TextStyle(color: Colors.white70, fontSize: 15)),
@@ -225,7 +236,7 @@ class AdminProfilePage extends StatelessWidget {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: Colors.redAccent.withValues(alpha:0.2),
+            color: Colors.redAccent.withOpacity(0.2),
             blurRadius: 15,
             offset: const Offset(0, 8),
           )
@@ -233,11 +244,10 @@ class AdminProfilePage extends StatelessWidget {
       ),
       child: ElevatedButton.icon(
         onPressed: () => _showLogoutDialog(context),
-        // MyAppIcon පාවිච්චි කළා
         icon: const MyAppIcon(iconData: Icons.power_settings_new_rounded),
         label: const Text("LOG OUT", style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.redAccent.withValues(alpha:0.85),
+          backgroundColor: Colors.redAccent.withOpacity(0.8),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           elevation: 0,
@@ -258,23 +268,20 @@ class AdminProfilePage extends StatelessWidget {
             side: const BorderSide(color: Colors.white12),
           ),
           title: const Text("Log Out", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          content: const Text("Are you sure you want to exit? You will need to login again to manage parkings.",
+          content: const Text("Are you sure you want to exit? You will need to login again.",
               style: TextStyle(color: Colors.white60, fontSize: 14)),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text("Stay", style: TextStyle(color: Colors.white38))
             ),
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: ElevatedButton(
-                  onPressed: () => _logout(context),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                  ),
-                  child: const Text("Log Out", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-              ),
+            ElevatedButton(
+                onPressed: () => _logout(context),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                ),
+                child: const Text("Log Out", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
             ),
           ],
         ),

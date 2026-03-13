@@ -4,7 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui';
 import 'my_app_icon.dart';
-import 'vehicle_entry_page.dart'; // Import the entry page
+import 'vehicle_entry_page.dart';
 
 class AdminQRScanner extends StatefulWidget {
   const AdminQRScanner({super.key});
@@ -33,13 +33,11 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
     }
   }
 
-
-
-
   // --- QR එක ස්කෑන් වුණාම සිදුවන ප්‍රධාන ලොජික් එක ---
-  void _handleScannedData(String scannedBookingId) async { // නම වෙනස් කළා පැහැදිලි වෙන්න
+  void _handleScannedData(String scannedBookingId) async {
     setState(() => isScanning = false);
 
+    // Loading Indicator එකක් පෙන්වීම
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -47,28 +45,30 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
     );
 
     try {
+      // Bookings collection එකෙන් අදාළ ලේඛනය ලබා ගැනීම
       var doc = await FirebaseFirestore.instance.collection('bookings').doc(scannedBookingId).get();
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); // Loading indicator එක ඉවත් කිරීම
 
       if (doc.exists) {
         var data = doc.data()!;
 
+        // දැනටමත් පාවිච්චි කර ඇත්නම් හෝ cancel කර ඇත්නම් පරීක්ෂා කිරීම
         if (data['status'] != 'pending') {
           _showError("This booking is already ${data['status']}.");
           return;
         }
 
-        // ✅ මෙන්න මෙතන තමයි වැදගත්ම දේ:
-        // අපි VehicleEntryPage එකට අවශ්‍ය 'rates' ටික Firestore එකෙන් අරන් පාස් කරනවා.
+        // ✅ නිවැරදි කළ කොටස: VehicleEntryPage එකට අවශ්‍ය සියලුම දත්ත ලබා දීම
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => VehicleEntryPage(
               parkingId: data['parkingId'],
               parkingName: data['parkingName'],
-              rates: data['rates'] ?? {}, // Firestore එකේ තියෙන rates ටික මෙතනට දානවා
+              rates: data['rates'] ?? {},
+              parkingData: data, // 👈 මෙන්න මේ Argument එක තමයි අඩු වෙලා තිබුණේ
             ),
           ),
         );
@@ -81,15 +81,17 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
     }
   }
 
-
-
-
-
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
-    // තත්පර 2කින් පස්සේ ආයේ ස්කෑන් කරන්න ඉඩ දෙනවා
+    // තත්පර 2කින් පස්සේ නැවත ස්කෑන් කිරීමට ඉඩ දීම
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => isScanning = true);
     });
@@ -101,7 +103,8 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
       backgroundColor: const Color(0xFF0F172A),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("SCAN BOOKING QR", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5)),
+        title: const Text("SCAN BOOKING QR",
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -137,9 +140,8 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
   Widget _buildOverlay() {
     return Stack(
       children: [
-        // පේන ප්‍රදේශය විතරක් පැහැදිලි කරන Overlay එක
         ColorFiltered(
-          colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.7), BlendMode.srcOut),
+          colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.7), BlendMode.srcOut),
           child: Stack(
             children: [
               Container(color: Colors.black),
@@ -147,19 +149,21 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
                 child: Container(
                   width: 260,
                   height: 260,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30)
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        // Scanner Frame Design
         Center(
           child: Container(
             width: 260,
             height: 260,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.blueAccent, width: 2),
+              border: Border.all(color: Colors.blueAccent.withOpacity(0.5), width: 1),
               borderRadius: BorderRadius.circular(30),
             ),
             child: Stack(
@@ -177,7 +181,8 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
           left: 0,
           right: 0,
           child: Center(
-            child: Text("Place the QR code inside the frame", style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: 0.5)),
+            child: Text("Place the QR code inside the frame",
+                style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: 0.5)),
           ),
         )
       ],
@@ -212,13 +217,20 @@ class _AdminQRScannerState extends State<AdminQRScanner> {
           children: [
             const MyAppIcon(iconData: Icons.camera_enhance_rounded, size: 80, color: Colors.blueAccent),
             const SizedBox(height: 25),
-            const Text("Camera Access Needed", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text("Camera Access Needed",
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            const Text("To scan parking tickets, we need your camera permission.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
+            const Text("To scan parking tickets, we need your camera permission.",
+                textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
             const SizedBox(height: 40),
             ElevatedButton(
               onPressed: _checkPermission,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+              ),
               child: const Text("ALLOW CAMERA", style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],

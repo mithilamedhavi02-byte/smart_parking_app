@@ -128,8 +128,6 @@ class DriverBookingScreen extends StatelessWidget {
   }
 
   void _handleBooking(BuildContext context, Map<String, dynamic> rates) {
-    // දැන් මෙතනදී Database එකට data දාන්නේ නැහැ.
-    // දත්ත ටික අරන් VehicleEntryPage එකට යනවා විතරයි.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -137,6 +135,7 @@ class DriverBookingScreen extends StatelessWidget {
           parkingId: parkingId,
           parkingName: parkingData['parkingName'] ?? "Parking Hub",
           rates: rates,
+          parkingData: parkingData, // 👈 මෙම පේළිය අනිවාර්යයි
         ),
       ),
     );

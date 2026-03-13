@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'my_app_icon.dart'; // 👈 අපේ custom icon class එක import කරගන්න
+import 'my_app_icon.dart';
 
-class ActiveVehiclesPage extends StatelessWidget {
+class ActiveVehiclesPage extends StatefulWidget {
   final String parkingId;
   final Map<String, dynamic> fullData;
 
@@ -13,7 +13,13 @@ class ActiveVehiclesPage extends StatelessWidget {
     required this.fullData,
   });
 
+  @override
+  State<ActiveVehiclesPage> createState() => _ActiveVehiclesPageState();
+}
+
+class _ActiveVehiclesPageState extends State<ActiveVehiclesPage> {
   final Color primaryBlue = const Color(0xFF0D47A1);
+  String _searchQuery = ""; // 👈 Search query එක save කරගන්න variable එක
 
   @override
   Widget build(BuildContext context) {
@@ -39,40 +45,81 @@ class ActiveVehiclesPage extends StatelessWidget {
               ),
             ),
           ),
-          Container(color: Colors.black.withValues(alpha: 0.85)),
+          Container(color: Colors.black.withOpacity(0.85)),
 
-          // 2. Data Stream
+          // 2. Data Content
           SafeArea(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('bookings')
-                  .where('parkingId', isEqualTo: parkingId)
-                  .where('status', isEqualTo: 'parked')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                return ListView.builder(
+            child: Column(
+              children: [
+                // --- Search Bar Section ---
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  itemCount: snapshot.data!.docs.length,
-                  itemBuilder: (context, index) {
-                    var doc = snapshot.data!.docs[index];
-                    var data = doc.data() as Map<String, dynamic>;
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: TextField(
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toUpperCase(); // 👈 Type කරන අකුරු uppercase කරලා query එක update කරනවා
+                        });
+                      },
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: "Search Vehicle Number...",
+                        hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                        prefixIcon: Icon(Icons.search, color: Colors.white38),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 15),
+                      ),
+                    ),
+                  ),
+                ),
 
-                    DateTime checkIn = (data['checkInTime'] as Timestamp?)?.toDate() ??
-                        (data['entryTime'] as Timestamp?)?.toDate() ??
-                        DateTime.now();
+                // --- Live Stream List ---
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('bookings')
+                        .where('parkingId', isEqualTo: widget.parkingId)
+                        .where('status', isEqualTo: 'parked')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
+                      }
 
-                    String vType = data['vehicleType'] ?? "Car";
-                    return _buildVehicleCard(context, doc.id, data, checkIn, vType);
-                  },
-                );
-              },
+                      // දත්ත filter කිරීම
+                      var filteredDocs = snapshot.data?.docs.where((doc) {
+                        var vNumber = (doc.data() as Map<String, dynamic>)['vehicleNumber']?.toString().toUpperCase() ?? "";
+                        return vNumber.contains(_searchQuery); // 👈 මෙතනින් තමයි search එකට අදාළ වාහන විතරක් පෙන්නන්නේ
+                      }).toList() ?? [];
+
+                      if (filteredDocs.isEmpty) {
+                        return _buildEmptyState(_searchQuery.isEmpty ? "No Active Vehicles" : "No Match Found");
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        itemCount: filteredDocs.length,
+                        itemBuilder: (context, index) {
+                          var doc = filteredDocs[index];
+                          var data = doc.data() as Map<String, dynamic>;
+
+                          DateTime checkIn = (data['checkInTime'] as Timestamp?)?.toDate() ??
+                              (data['entryTime'] as Timestamp?)?.toDate() ??
+                              DateTime.now();
+
+                          String vType = data['vehicleType'] ?? "Car";
+                          return _buildVehicleCard(context, doc.id, data, checkIn, vType);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -80,7 +127,8 @@ class ActiveVehiclesPage extends StatelessWidget {
     );
   }
 
-  // --- Vehicle List Card ---
+  // --- පහත Methods කලින් තිබූ ආකාරයටම පවතී (අවශ්‍ය තැන්වල widget.parkingId ආදේශ කර ඇත) ---
+
   Widget _buildVehicleCard(BuildContext context, String bId, Map<String, dynamic> data, DateTime checkIn, String vType) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -91,15 +139,15 @@ class ActiveVehiclesPage extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(25),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), shape: BoxShape.circle),
                   child: MyAppIcon(iconData: _getIcon(vType), color: Colors.blueAccent, size: 28),
                 ),
                 const SizedBox(width: 15),
@@ -117,7 +165,7 @@ class ActiveVehiclesPage extends StatelessWidget {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+                    backgroundColor: Colors.redAccent.withOpacity(0.1),
                     foregroundColor: Colors.redAccent,
                     side: const BorderSide(color: Colors.redAccent, width: 0.5),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -135,17 +183,15 @@ class ActiveVehiclesPage extends StatelessWidget {
     );
   }
 
-  // --- Checkout Calculation Logic ---
   void _showCheckoutConfirm(BuildContext context, String bId, Map<String, dynamic> data, DateTime checkIn) {
     DateTime now = DateTime.now();
     Duration diff = now.difference(checkIn);
-
     int hours = diff.inHours;
     if (diff.inMinutes % 60 > 0) hours++;
     if (hours == 0) hours = 1;
 
-    int firstHour = int.tryParse(fullData['rates']?['firstHour']?.toString() ?? '100') ?? 100;
-    int extraHour = int.tryParse(fullData['rates']?['extraHour']?.toString() ?? '80') ?? 80;
+    int firstHour = int.tryParse(widget.fullData['rates']?['firstHour']?.toString() ?? '100') ?? 100;
+    int extraHour = int.tryParse(widget.fullData['rates']?['extraHour']?.toString() ?? '80') ?? 80;
     int totalBill = firstHour + ((hours - 1) * extraHour);
 
     showDialog(
@@ -178,11 +224,9 @@ class ActiveVehiclesPage extends StatelessWidget {
                   'totalBill': totalBill,
                   'stayDuration': "$hours Hr(s)",
                 });
-
-                await FirebaseFirestore.instance.collection('parkings').doc(parkingId).update({
+                await FirebaseFirestore.instance.collection('parkings').doc(widget.parkingId).update({
                   'currentFree.$vType': FieldValue.increment(1),
                 });
-
                 if (context.mounted) {
                   Navigator.pop(context);
                   _showReceiptDialog(context, data, totalBill, hours);
@@ -196,7 +240,7 @@ class ActiveVehiclesPage extends StatelessWidget {
     );
   }
 
-  // --- Official Receipt UI ---
+  // ---Receipt UI, Icon helper and row widgets ---
   void _showReceiptDialog(BuildContext context, Map<String, dynamic> data, int bill, int hours) {
     showDialog(
       context: context,
@@ -209,7 +253,6 @@ class ActiveVehiclesPage extends StatelessWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Error Fixed: standard Icon වෙනුවට MyAppIcon පාවිච්චි කළා
               const MyAppIcon(iconData: Icons.check_circle_rounded, color: Colors.green, size: 70),
               const SizedBox(height: 10),
               const Text("PAYMENT SUCCESS", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black)),
@@ -225,17 +268,10 @@ class ActiveVehiclesPage extends StatelessWidget {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Receipt print logic can go here
-                  },
-                  // Error Fixed: icon parameter එකට MyAppIcon පාවිච්චි කළා
+                  onPressed: () {},
                   icon: const MyAppIcon(iconData: Icons.print_rounded, size: 18, color: Colors.white),
                   label: const Text("PRINT RECEIPT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
                 ),
               ),
               const SizedBox(height: 10),
@@ -247,14 +283,14 @@ class ActiveVehiclesPage extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(String msg) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          MyAppIcon(iconData: Icons.local_parking_rounded, size: 80, color: Colors.white.withValues(alpha: 0.1)),
+          MyAppIcon(iconData: Icons.local_parking_rounded, size: 80, color: Colors.white.withOpacity(0.1)),
           const SizedBox(height: 15),
-          const Text("No Active Vehicles", style: TextStyle(color: Colors.white24, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
+          Text(msg, style: const TextStyle(color: Colors.white24, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
         ],
       ),
     );

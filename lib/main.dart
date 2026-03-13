@@ -129,19 +129,46 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
                   children: [
-                    // උඩ තියෙන හිස් ඉඩ අඩු කළා (3 සිට 1 දක්වා)
                     const Spacer(flex: 1),
 
-
-                    const Text(
-                      "PARK-PRO",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 8
-                      ),
+                    // --- Colorful Animated PARK-PRO ---
+                    TweenAnimationBuilder<int>(
+                      duration: const Duration(milliseconds: 2000),
+                      tween: IntTween(begin: 0, end: "PARK-PRO".length),
+                      builder: (context, value, child) {
+                        return ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [
+                              Color(0xFF00E5FF), // Cyan
+                              Color(0xFF3B82F6), // Blue
+                              Color(0xFFA855F7), // Purple
+                            ],
+                          ).createShader(bounds),
+                          child: Text(
+                            "PARK-PRO".substring(0, value),
+                            style: TextStyle(
+                              color: Colors.white, // Shader එක නිසා මෙය Gradient එකක් ලෙස පෙනේ
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 8,
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 20,
+                                  color: const Color(0xFF00E5FF).withOpacity(0.5),
+                                  offset: const Offset(0, 0),
+                                ),
+                                Shadow(
+                                  blurRadius: 40,
+                                  color: const Color(0xFFA855F7).withOpacity(0.3),
+                                  offset: const Offset(0, 0),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
+
                     const Text(
                       "SMART PARKING REDEFINED",
                       style: TextStyle(
@@ -152,8 +179,6 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
                       ),
                     ),
 
-                    // මැද තියෙන හිස් ඉඩ වැඩි කළා (2 සිට 4 දක්වා)
-                    // එවිට උඩ කොටස තවත් ඉහළට තල්ලු වෙනවා
                     const Spacer(flex: 4),
 
                     // Premium Animated Button
