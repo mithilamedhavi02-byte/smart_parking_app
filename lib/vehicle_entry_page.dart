@@ -35,8 +35,9 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
   }
 
   void _loadVehicleTypes() {
-    Map<String, dynamic> slots = widget.parkingData['totalSlotsMap'] ??
-        widget.parkingData['capacity'] ?? {};
+    // ✅ FIX: ඔයාගේ DB එකේ තියෙන්නේ 'capacity' කියන field එක නිසා ඒක මුලින්ම ගන්නවා
+    Map<String, dynamic> slots = widget.parkingData['capacity'] ??
+        widget.parkingData['totalSlotsMap'] ?? {};
 
     setState(() {
       _vehicleTypes = slots.keys.toList();
@@ -46,7 +47,6 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
     });
   }
 
-  // ✅ වාහන ඉඩ පරීක්ෂා කර Booking එක සිදු කරන ප්‍රධාන Function එක
   Future<void> _confirmBooking() async {
     if (_numController.text.isEmpty) {
       _showSnackBar("Please enter vehicle number");
@@ -71,9 +71,15 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
 
       int occupiedCount = snapshot.docs.length;
 
-      // 2. Admin විසින් ලබා දී ඇති මුළු ඉඩ ප්‍රමාණය ලබා ගැනීම
-      Map<String, dynamic> slotsMap = widget.parkingData['totalSlotsMap'] ?? {};
+      // ✅ 2. FIX: Admin ලබා දී ඇති 'capacity' එකෙන් අදාළ වාහන වර්ගයට ඇති ඉඩ ප්‍රමාණය ගැනීම
+      Map<String, dynamic> slotsMap = widget.parkingData['capacity'] ??
+          widget.parkingData['totalSlotsMap'] ?? {};
+
+      // String එකක් විදිහට හෝ Int එකක් විදිහට තිබුණත් හරියටම ගණන ගන්නවා
       int totalCapacity = int.tryParse(slotsMap[_selectedType].toString()) ?? 0;
+
+      // DEBUG PRINT: Logic එක වැඩද කියලා බලන්න Console එක බලන්න
+      print("Type: $_selectedType | Total: $totalCapacity | Occupied: $occupiedCount");
 
       // 3. ඉඩ තිබේදැයි පරීක්ෂා කිරීම
       if (occupiedCount >= totalCapacity) {
@@ -107,6 +113,7 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Booking Confirmed!"), backgroundColor: Colors.green),
         );
+        // මුල් Screen එකටම යනවා
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
@@ -120,7 +127,6 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ✅ ඉඩ නොමැති විට පෙන්වන Alert එක
   void _showErrorDialog(String title, String message) {
     showDialog(
       context: context,
@@ -152,7 +158,7 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         title: const Text("VEHICLE ENTRY",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -175,13 +181,14 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("ENTER DETAILS",
-                      style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
+                  const Text("ENTER VEHICLE NUMBER",
+                      style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                  const SizedBox(height: 15),
                   _buildGlassInput(
                     child: TextField(
                       controller: _numController,
                       style: const TextStyle(color: Colors.white),
+                      textCapitalization: TextCapitalization.characters,
                       decoration: const InputDecoration(
                         hintText: "Ex: WP ABC-1234",
                         hintStyle: TextStyle(color: Colors.white24),
@@ -190,10 +197,10 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 25),
-                  const Text("VEHICLE TYPE",
-                      style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 30),
+                  const Text("SELECT VEHICLE TYPE",
+                      style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                  const SizedBox(height: 15),
                   _buildGlassInput(
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
@@ -225,12 +232,14 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
                       onPressed: _loading ? null : _confirmBooking,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blueAccent,
+                        elevation: 8,
+                        shadowColor: Colors.blueAccent.withOpacity(0.5),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
                       child: _loading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text("CONFIRM RESERVATION",
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15)),
                     ),
                   ),
                 ],
@@ -244,7 +253,7 @@ class _VehicleEntryPageState extends State<VehicleEntryPage> {
 
   Widget _buildGlassInput({required Widget child}) {
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(15),
