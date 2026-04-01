@@ -4,18 +4,31 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:ui';
 
+// Asgardeo සඳහා ඔයාගේ pubspec එකේ ඇති package එක
+import 'package:flutter_appauth/flutter_appauth.dart';
+
 // Import screens
 import 'auth_wrapper.dart';
 import 'login_screen.dart';
 import 'admin_setup.dart';
 import 'admin_dashboard.dart';
 import 'driver_dashboard.dart';
-import 'my_app_icon.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. Firebase Initialize කිරීම
   await Firebase.initializeApp();
+
   runApp(const ParkProApp());
+}
+
+// Asgardeo Configuration එක මේ විදිහට වෙනම තබා ගැනීම පහසුයි
+class AsgardeoConfig {
+  static const String clientId = "wyFL14yl8Nf_VNVnedaDe0r5MQUa"; // ඔයාගේ Client ID එක
+  static const String redirectUri = "wso2.asgardeo.io.sample://login-callback"; //
+  static const String organizationName = "org78shy"; //
+  static const String discoveryUrl = "https://api.asgardeo.io/t/org78shy/oauth2/token/.well-known/openid-configuration";
 }
 
 class ParkProApp extends StatelessWidget {
@@ -94,7 +107,6 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
     return Scaffold(
       body: Stack(
         children: [
-          // Background Video
           SizedBox.expand(
             child: FittedBox(
               fit: BoxFit.cover,
@@ -105,8 +117,6 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
               ),
             ),
           ),
-
-          // Gradient Overlay
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -119,9 +129,6 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
               ),
             ),
           ),
-
-
-
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -130,62 +137,34 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
                 child: Column(
                   children: [
                     const Spacer(flex: 1),
-
-                    // --- Colorful Animated PARK-PRO ---
                     TweenAnimationBuilder<int>(
                       duration: const Duration(milliseconds: 2000),
                       tween: IntTween(begin: 0, end: "PARK-PRO".length),
                       builder: (context, value, child) {
                         return ShaderMask(
                           shaderCallback: (bounds) => const LinearGradient(
-                            colors: [
-                              Color(0xFF00E5FF), // Cyan
-                              Color(0xFF3B82F6), // Blue
-                              Color(0xFFA855F7), // Purple
-                            ],
+                            colors: [Color(0xFF00E5FF), Color(0xFF3B82F6), Color(0xFFA855F7)],
                           ).createShader(bounds),
                           child: Text(
                             "PARK-PRO".substring(0, value),
-                            style: TextStyle(
-                              color: Colors.white, // Shader එක නිසා මෙය Gradient එකක් ලෙස පෙනේ
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 48,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 8,
-                              shadows: [
-                                Shadow(
-                                  blurRadius: 20,
-                                  color: const Color(0xFF00E5FF).withOpacity(0.5),
-                                  offset: const Offset(0, 0),
-                                ),
-                                Shadow(
-                                  blurRadius: 40,
-                                  color: const Color(0xFFA855F7).withOpacity(0.3),
-                                  offset: const Offset(0, 0),
-                                ),
-                              ],
                             ),
                           ),
                         );
                       },
                     ),
-
                     const Text(
                       "SMART PARKING REDEFINED",
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                          letterSpacing: 3,
-                          fontWeight: FontWeight.bold
-                      ),
+                      style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 3, fontWeight: FontWeight.bold),
                     ),
-
                     const Spacer(flex: 4),
-
-                    // Premium Animated Button
                     AnimatedPremiumButton(
                       onTap: () => Navigator.pushReplacementNamed(context, '/auth'),
                     ),
-
                     const SizedBox(height: 30),
                     const Text(
                       "v1.0.2 • SECURE CLOUD-SYNC ENABLED",
@@ -197,16 +176,12 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> with SingleTicker
               ),
             ),
           ),
-
-
-
         ],
       ),
     );
   }
 }
 
-// --- 🔥 Animated Neon Button Widget ---
 class AnimatedPremiumButton extends StatefulWidget {
   final VoidCallback onTap;
   const AnimatedPremiumButton({super.key, required this.onTap});
@@ -215,17 +190,13 @@ class AnimatedPremiumButton extends StatefulWidget {
   State<AnimatedPremiumButton> createState() => _AnimatedPremiumButtonState();
 }
 
-class _AnimatedPremiumButtonState extends State<AnimatedPremiumButton>
-    with SingleTickerProviderStateMixin {
+class _AnimatedPremiumButtonState extends State<AnimatedPremiumButton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
   }
 
   @override
@@ -249,39 +220,13 @@ class _AnimatedPremiumButtonState extends State<AnimatedPremiumButton>
               gradient: LinearGradient(
                 begin: Alignment(_controller.value * 2 - 1, -1),
                 end: Alignment(_controller.value * 2, 1),
-                colors: const [
-                  Color(0xFF000000),
-                  Color(0xFF0D47A1),
-                  Color(0xFF00E5FF), // Neon Glow
-                  Color(0xFF4A148C),
-                  Color(0xFF000000),
-                ],
+                colors: const [Color(0xFF000000), Color(0xFF0D47A1), Color(0xFF00E5FF), Color(0xFF4A148C), Color(0xFF000000)],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00E5FF).withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: -5,
-                ),
-              ],
+              boxShadow: [BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.3), blurRadius: 20, spreadRadius: -5)],
               border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
             ),
-            child: Row(
-              children: [
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-
-
-                ),
-                const Expanded(
-                  child: Center(
-                    child: Text("GET STARTED",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
-                  ),
-                ),
-                const SizedBox(width: 50),
-              ],
+            child: const Center(
+              child: Text("GET STARTED", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
             ),
           ),
         );

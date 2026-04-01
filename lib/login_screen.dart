@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
+// පහත import එක ඔයාගේ project එකේ folder structure එක අනුව නිවැරදි දැයි බලන්න
 import 'my_app_icon.dart';
+import 'package:flutter_appauth/flutter_appauth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,6 +44,43 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+// --- Asgardeo Login Function Updated with Your Real Credentials ---
+  Future<void> _handleAsgardeoSignIn() async {
+    // ඔයාගේ Asgardeo Console එකෙන් ගත්තු නිවැරදි දත්ත මෙන්න
+    const String clientId = 'wyFL14yl8Nf_VNVnedaDe0r5MQUa';
+    const String orgName = 'org78shy';
+    const String redirectUrl = 'wso2.asgardeo.io.sample://login-callback';
+    const String discoveryUrl = 'https://api.asgardeo.io/t/$orgName/oauth2/token/.well-known/openid-configuration';
+
+    final FlutterAppAuth appAuth = const FlutterAppAuth();
+
+    setState(() => _isLoading = true);
+    try {
+      final AuthorizationTokenResponse? result = await appAuth.authorizeAndExchangeCode(
+        AuthorizationTokenRequest(
+          clientId,
+          redirectUrl,
+          discoveryUrl: discoveryUrl,
+          scopes: ['openid', 'profile', 'email'],
+        ),
+      );
+
+      if (result != null && result.accessToken != null) {
+        debugPrint("Access Token: ${result.accessToken}");
+        if (!mounted) return;
+        _msg("Asgardeo Login Successful!", Colors.greenAccent);
+
+        // සාර්ථක වූ පසු Driver Dashboard එකට යොමු කෙරේ
+        Navigator.pushReplacementNamed(context, '/driver-dashboard');
+      }
+    } catch (e) {
+      debugPrint("Asgardeo Error: $e");
+      _msg("Asgardeo Login Failed! Please try again.", Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _submit() async {
     final emailTxt = _email.text.trim();
     final passTxt = _password.text.trim();
@@ -64,18 +103,17 @@ class _LoginScreenState extends State<LoginScreen> {
         if (doc.exists) {
           if (!mounted) return;
           if (_role == 'admin') {
-            // කෙළින්ම Dashboard එකට navigate කිරීම
             Navigator.pushReplacementNamed(context, '/admin-dashboard');
           } else {
             Navigator.pushReplacementNamed(context, '/driver-dashboard');
           }
         } else {
           await FirebaseAuth.instance.signOut();
-          _msg("Access Denied: You are not registered as a ${_role.toUpperCase()}", Colors.orangeAccent);
+          _msg("Access Denied: Not registered as ${_role.toUpperCase()}", Colors.orangeAccent);
         }
       } else {
         if (_name.text.isEmpty || _phone.text.isEmpty) {
-          _msg("All fields are required for registration", Colors.redAccent);
+          _msg("All fields are required", Colors.redAccent);
           setState(() => _isLoading = false);
           return;
         }
@@ -89,18 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
           'name': _name.text.trim(),
           'email': emailTxt,
           'phone': _phone.text.trim(),
-          'role': _role == 'admin' ? 'admin' : 'driver',
-          if (_role == 'admin') 'parking_setup': false,
+          'role': _role,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        _msg("Account created! Please login now.", Colors.greenAccent);
+        _msg("Account created! Please login.", Colors.greenAccent);
         _toggleView();
       }
     } on FirebaseAuthException catch (e) {
       _msg(e.message ?? "Authentication failed", Colors.redAccent);
     } catch (e) {
-      _msg("Something went wrong. Try again.", Colors.redAccent);
+      _msg("Something went wrong.", Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -111,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
+          // Background Image (Ensure assets/bg.jpg exists)
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(image: AssetImage('assets/bg.jpg'), fit: BoxFit.cover),
@@ -121,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.8)],
+                colors: [Colors.black.withOpacity(0.4), Colors.black.withOpacity(0.9)],
               ),
             ),
           ),
@@ -131,20 +169,20 @@ class _LoginScreenState extends State<LoginScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(30),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
                     padding: const EdgeInsets.all(30),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(color: Colors.white.withOpacity(0.2)),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const MyAppIcon(iconData: Icons.local_parking_rounded, size: 80, color: Colors.white),
+                        const Icon(Icons.local_parking_rounded, size: 70, color: Colors.white),
                         const SizedBox(height: 10),
-                        const Text("PARK-PRO", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 3)),
+                        const Text("PARK-PRO", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4)),
                         const SizedBox(height: 30),
                         _buildRoleSelector(),
                         const SizedBox(height: 25),
@@ -160,7 +198,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 35),
                         _isLoading
                             ? const CircularProgressIndicator(color: Colors.blueAccent)
-                            : _btn(),
+                            : Column(
+                          children: [
+                            _btn(), // Firebase Sign In
+                            if (_isLogin) ...[
+                              const SizedBox(height: 15),
+                              _asgardeoBtn(), // Asgardeo Sign In
+                            ],
+                          ],
+                        ),
                         const SizedBox(height: 20),
                         TextButton(
                           onPressed: _toggleView,
@@ -208,15 +254,14 @@ class _LoginScreenState extends State<LoginScreen> {
           duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: sel ? Colors.blueAccent : Colors.white.withOpacity(0.1),
+            color: sel ? Colors.blueAccent : Colors.white.withOpacity(0.05),
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: sel ? Colors.white : Colors.white10),
-            boxShadow: sel ? [BoxShadow(color: Colors.blueAccent.withOpacity(0.4), blurRadius: 10, spreadRadius: 1)] : [],
+            border: Border.all(color: sel ? Colors.white70 : Colors.white10),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              MyAppIcon(iconData: icon, color: Colors.white, size: 18),
+              Icon(icon, color: Colors.white, size: 18),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
             ],
@@ -234,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         labelText: l,
         labelStyle: const TextStyle(color: Colors.white38, fontSize: 14),
-        prefixIcon: MyAppIcon(iconData: i, color: Colors.white70, size: 20),
+        prefixIcon: Icon(i, color: Colors.white70, size: 20),
         filled: true,
         fillColor: Colors.white.withOpacity(0.05),
         contentPadding: const EdgeInsets.symmetric(vertical: 18),
@@ -253,9 +298,27 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: Colors.blueAccent,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 5,
         ),
         onPressed: _submit,
         child: Text(_isLogin ? "SIGN IN" : "CREATE ACCOUNT", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1)),
+      ),
+    );
+  }
+
+  Widget _asgardeoBtn() {
+    return SizedBox(
+      width: double.infinity,
+      height: 55,
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.orangeAccent, width: 2),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        ),
+        onPressed: _handleAsgardeoSignIn,
+        icon: const Icon(Icons.security, color: Colors.orangeAccent),
+        label: const Text("SIGN IN WITH ASGARDEO", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
       ),
     );
   }
